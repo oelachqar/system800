@@ -2,7 +2,7 @@ import re
 
 from uszipcode import SearchEngine as ZipcodeSearchEngine
 
-from utils import state_abbrev as states
+from workflow.extract.utils import state_abbrev as states
 
 
 def get_re_for_location_parsing():
