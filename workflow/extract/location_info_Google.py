@@ -1,12 +1,9 @@
 import re
-
 from uszipcode import SearchEngine as ZipcodeSearchEngine
-
-from workflow.extract.utils import state_abbrev as states
-
+from workflow.extract.utils import states_abbrev_lowercase
 
 def get_re_for_location_parsing():
-    states_or = '|'.join(states.keys())
+    states_or = '|'.join(states_abbrev_lowercase.keys())
     return r"({states_or})".format(**locals()) + r" (\d{5})"
 
 def find_possible_locations(s):
@@ -14,34 +11,35 @@ def find_possible_locations(s):
     return list(set(re.findall('(?i)'+q, s)))
 
 def extract_location(s):
+    """ Examples:
+    'something something in Seattle Washington 98102'
+    -> {'State': 'WA', 
+        'City':'Seattle', 
+        'Zipcode':'98102', 
+        'Confidence_location':'high'}
+
+    'here the zip code does not match the state somecity texas 10983'
+    -> {'State': 'TX', '
+        City': None, 
+        'Zipcode': '10983', 
+        'Confidence_location': 'low'}
+    """
     z_search = ZipcodeSearchEngine()
     possible_locations = find_possible_locations(s)
     keys = ['State', 'City', 'Zipcode']
     for state, zipcode in possible_locations:
         zip_info = z_search.by_zipcode(zipcode)
-        state = state.capitalize()
-        if states[state] == zip_info.state:
+        if states_abbrev_lowercase[state.lower()] == zip_info.state:
             d = {key: getattr(zip_info, key.lower()) for key in keys}
             d["Confidence_location"] = "high"
             return d
     if possible_locations != []:
-        return {'State': possible_locations[0][0],
+        d = {'State': states_abbrev_lowercase[possible_locations[0][0].lower()],
                 'City': None,
                 'Zipcode': possible_locations[0][1],
                 'Confidence_location': "low"}
+        print(d)
+        return d
     else:
-#        return {'State': None,
-#                'City': None,
-#                'Zipcode': None,
-#                'Confidence_location': None}
         return None
 
-if __name__ == "__main__":
-    ss = [
-        'washington 98102',
-        'massachusetts 02138',
-        'texas 10983', # uszipcode fails as zip does not match state
-    ]
-    for s in ss:
-        print('\n' + s)
-        print(extract_location(s))

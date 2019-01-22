@@ -178,9 +178,9 @@ state_abbrev = {
     'Wisconsin': 'WI',
     'Wyoming': 'WY',
 }
-states = {}
+states_abbrev_lowercase = {}
 for state in state_abbrev:
-    states[state.lower()] = state_abbrev[state]
+    states_abbrev_lowercase[state.lower()] = state_abbrev[state]
 
 
 def years_to_digits(s):
