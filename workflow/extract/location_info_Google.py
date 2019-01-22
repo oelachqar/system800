@@ -2,7 +2,7 @@ import re
 
 from uszipcode import SearchEngine as ZipcodeSearchEngine
 
-from extract.utils import state_abbrev as states
+from utils import state_abbrev as states
 
 
 def get_re_for_location_parsing():
@@ -11,7 +11,7 @@ def get_re_for_location_parsing():
 
 def find_possible_locations(s):
     q = get_re_for_location_parsing()
-    return list(set(re.findall(q, s)))
+    return list(set(re.findall('(?i)'+q, s)))
 
 def extract_location(s):
     z_search = ZipcodeSearchEngine()
@@ -19,6 +19,7 @@ def extract_location(s):
     keys = ['State', 'City', 'Zipcode']
     for state, zipcode in possible_locations:
         zip_info = z_search.by_zipcode(zipcode)
+        state = state.capitalize()
         if states[state] == zip_info.state:
             d = {key: getattr(zip_info, key.lower()) for key in keys}
             d["Confidence_location"] = "high"
