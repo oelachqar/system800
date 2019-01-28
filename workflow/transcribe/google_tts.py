@@ -3,8 +3,8 @@ import speech_recognition as sr
 
 from .tts_status import TranscriptionStatus
 
-class GoogleTranscriber(object):
 
+class GoogleTranscriber(object):
     def __init__(self, google_credentials_json, google_preferred_phrases):
         self.google_creds = google_credentials_json
         self.language = "en-US"
@@ -33,8 +33,9 @@ class GoogleTranscriber(object):
                 print("Google Cloud Speech could not understand audio: {0}".format(e))
             except sr.RequestError as e:
                 transcription_status = TranscriptionStatus.request_error
-                print("Could not request results from Google Cloud Speech "
-                      "service; {0}".format(e))
+                print(
+                    "Could not request results from Google Cloud Speech " "service; {0}".format(e)
+                )
             except Exception:
                 print("Unknown transcription error:", sys.exc_info())
                 transcription_status = TranscriptionStatus.unknown_error
