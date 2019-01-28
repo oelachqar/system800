@@ -24,6 +24,4 @@ class TestConfig(Config):
     test_call_recording_file = os.getenv("TEST_CALL_RECORDING_FILE")
 
     # tts testing
-
-
-test_google_audio_path = os.getenv("TEST_GOOGLE_AUDIO_PATH")
+    test_google_audio_path = os.getenv("TEST_GOOGLE_AUDIO_PATH")
