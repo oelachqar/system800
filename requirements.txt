@@ -1,0 +1,3 @@
+uszipcode
+python-dotenv
+SpeechRecognition
