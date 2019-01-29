@@ -1,12 +1,11 @@
 from __future__ import print_function
 
 import calendar
-from collections import OrderedDict
 import dateutil.parser as dparser
 from datetime import datetime
 import re
 
-import utils
+import workflow.extract.utils as utils
 
 
 def create_digits_for_date_parsing(s):
@@ -90,7 +89,7 @@ def extract_date_time_base(s):
     default_1 = datetime(1900, 1, 1, 0, 0)
     default_2 = datetime(1999, 12, 25, 23, 0)
     fields = ['year', 'month', 'day', 'hour', 'minute']
-    d = OrderedDict()
+    d = {} 
     for field in fields:
         d[field] = None
     for date in possible_dates:
