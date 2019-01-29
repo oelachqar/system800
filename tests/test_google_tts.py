@@ -3,7 +3,7 @@ import unittest
 from config import TestConfig
 from workflow.transcribe.google_tts import GoogleTranscriber
 
-
+@unittest.skip
 class TestGoogleTranscriber(unittest.TestCase):
     def setUp(self):
         self.google_transcriber = GoogleTranscriber(
