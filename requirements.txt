@@ -2,3 +2,5 @@ uszipcode
 python-dotenv
 SpeechRecognition
 twilio
+celery
+flask

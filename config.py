@@ -17,6 +17,10 @@ class Config(object):
     # tts config
     google_credentials_json = os.getenv("GOOGLE_CREDENTIALS_JSON")
 
+    # celery config
+    celery_broker = os.getenv("CELERY_BROKER_URL")
+    celery_result_backend = os.getenv("CELERY_RESULT_BACKEND")
+
 
 class TestConfig(Config):
     # call testing

@@ -62,6 +62,7 @@ def main(case_number, recording_file):
     twilio.delete_call(call_sid)
 
 
+@unittest.skip
 class TestTwilioCallWrapper(unittest.TestCase):
     def test_make_and_record_call(self):
         main(TestConfig.test_call_case_number, TestConfig.test_call_recording_file)
