@@ -119,14 +119,4 @@ def extract_date_time(s):
              'hour': None, 'minute': None})
     
 
-if __name__ == "__main__":
-    ss = [
-        'april thirteen two thousand nineteen at for thirty AM',
-        'twenty third street january seventh at ate AM',
-        'march avenue february two thousand and twenty at nine AM',
-        ('judge may smith at address involving march and twenty third st '
-         'on march third two thousand twenty one at one forty five AM'),
-    ]
-    for s in ss:
-        print('\n' + s)
-        print(extract_date_time(s))
+
