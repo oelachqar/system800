@@ -1,6 +1,7 @@
 import time
-from flask import Flask, flash, render_template, request
+from flask import Flask, flash, render_template, request, jsonify
 from celery import chain
+from celery.result import AsyncResult
 
 from .celery_app import make_celery
 
@@ -9,7 +10,6 @@ from config import Config
 #
 # Init apps
 #
-
 app = Flask(__name__)
 app.config.update(
     CELERY_BROKER_URL=Config.celery_broker,
@@ -20,21 +20,18 @@ celery = make_celery(app, name="app")
 #
 # Flask Routes
 #
-
 @app.route("/process")
 def process():
     ain = request.args.get("ain")
-
-    print(ain)
     result = chain(call.s(ain), transcribe.s(), extract_info.s(), send_result.s())()
-    result = result.wait()
-    # queue workflow
-    return f"hello {result}"
+    return jsonify({"id": result.id, "ain": ain, "task_id": result.task_id, "status": result.status, "state": result.state})
 
-@app.route("/status/<request_id>")
-def status(request_id):
-    print(request_id)
-    return "done"
+
+@app.route("/status/<task_id>")
+def status(task_id):
+    result = AsyncResult(task_id)
+    return jsonify({"task_id": result.task_id, "status": result.status, "state": result.state})
+
 
 
 #
