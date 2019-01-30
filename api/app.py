@@ -20,18 +20,27 @@ celery = make_celery(app, name="app")
 #
 # Flask Routes
 #
-@app.route("/process")
+@app.route("/process", methods=["POST"])
 def process():
     ain = request.args.get("ain")
     result = chain(call.s(ain), transcribe.s(), extract_info.s(), send_result.s())()
-    return jsonify({"id": result.id, "ain": ain, "task_id": result.task_id, "status": result.status, "state": result.state})
+    return jsonify(
+        {
+            "id": result.id,
+            "ain": ain,
+            "task_id": result.task_id,
+            "status": result.status,
+            "state": result.state,
+        }
+    )
 
 
 @app.route("/status/<task_id>")
 def status(task_id):
     result = AsyncResult(task_id)
-    return jsonify({"task_id": result.task_id, "status": result.status, "state": result.state})
-
+    return jsonify(
+        {"task_id": result.task_id, "status": result.status, "state": result.state}
+    )
 
 
 #

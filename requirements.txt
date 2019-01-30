@@ -3,4 +3,5 @@ python-dotenv
 SpeechRecognition
 twilio
 celery
+redis
 flask
