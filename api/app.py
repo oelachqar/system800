@@ -49,7 +49,7 @@ def process():
 
     result = chain(
         call.s(callback_url, ain),
-        get_recording_uri.s(),
+        get_recording_uri.s().set(countdown=60),  # delay getting the recording as the call takes time
         transcribe.s(),
         extract_info.s(),
         send_result.s(),
@@ -78,7 +78,7 @@ def status(task_id):
 # Celery Tasks
 #
 
-@celery.task(bind=True, rate_limit=1, track_started=True)
+@celery.task(bind=True, rate_limit="1/s", track_started=True)
 def call(self, callback_url, ain):
     """
         This task is rate limited to 1 request per second because of twilio limitations.
