@@ -78,7 +78,7 @@ def status(task_id):
 # Celery Tasks
 #
 
-@celery.task(bind=True, rate_limit=1)
+@celery.task(bind=True, rate_limit=1, track_started=True)
 def call(self, callback_url, ain):
     """
         This task is rate limited to 1 request per second because of twilio limitations.
@@ -99,7 +99,7 @@ def call(self, callback_url, ain):
 # - add sensible values for max retries and delay to config
 # - remove asserts
 # - error logging
-@celery.task(bind=True, max_retries=10, retry_backoff=10, retry_jitter=True)
+@celery.task(bind=True, max_retries=10, retry_backoff=10, retry_jitter=True, track_started=True)
 def get_recording_uri(self, callback_url_and_call_sid):
     callback_url, call_sid = callback_url_and_call_sid
     logger.info(f"Recording uri task  got callback_url = {callback_url}, call_sid = {call_sid}.")
@@ -137,7 +137,7 @@ def get_recording_uri(self, callback_url_and_call_sid):
     return callback_url, recording_uri
 
 
-@celery.task(bind=True)
+@celery.task(bind=True, track_started=True)
 def transcribe(self, callback_url_and_recording_uri):
     callback_url, recording_uri = callback_url_and_recording_uri
     logger.info(f"Transcribe task got callback_url = {callback_url}, recording_uri = {recording_uri}.")
@@ -159,7 +159,7 @@ def transcribe(self, callback_url_and_recording_uri):
     return callback_url, text
 
 
-@celery.task(bind=True)
+@celery.task(bind=True, track_started=True)
 def extract_info(self, callback_url_and_text):
     callback_url, text = callback_url_and_text
     logger.info(f"Extract got callback_url = {callback_url}, text = {text}.")
