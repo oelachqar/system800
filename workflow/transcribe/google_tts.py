@@ -1,3 +1,5 @@
+import io
+import requests
 import sys
 import speech_recognition as sr
 
@@ -11,6 +13,11 @@ class GoogleTranscriber(object):
         self.preferred_phrases = google_preferred_phrases
 
     def transcribe_audio_file_path(self, audio_file_path):
+        """ Transcribe the audio at the given location.
+
+        audio_file_path: may be a filename or a file object
+        https://github.com/Uberi/speech_recognition/blob/master/reference/library-reference.rst#audiofilefilename_or_fileobject-unionstr-ioiobase---audiofile
+        """
         r = sr.Recognizer()
         transcript = ""
         transcription_status = TranscriptionStatus.success
@@ -40,3 +47,12 @@ class GoogleTranscriber(object):
                 print("Unknown transcription error:", sys.exc_info())
                 transcription_status = TranscriptionStatus.unknown_error
         return transcript, transcription_status
+
+    # TODO
+    # deal with exceptions
+    def transcribe_audio_at_uri(self, audio_uri):
+        response = requests.get(audio_uri)
+
+        audio = io.BytesIO(response.content)
+
+        return self.transcribe_audio_file_path(audio)
