@@ -96,10 +96,9 @@ def call(self, callback_url, ain):
 
 # TODO:
 # - add sensible values for max retries and delay to config
-# - add a backoff
 # - remove asserts
 # - error logging
-@celery.task(bind=True, max_retries=10)
+@celery.task(bind=True, max_retries=10, retry_backoff=10, retry_jitter=True)
 def get_recording_uri(self, callback_url_and_call_sid):
     callback_url, call_sid = callback_url_and_call_sid
     logger.info(f"Recording uri task  got callback_url = {callback_url}, call_sid = {call_sid}.")
