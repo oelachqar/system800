@@ -3,6 +3,7 @@ python-dateutil
 python-dotenv
 twilio
 celery
+flower
 redis
 flask
 SpeechRecognition
