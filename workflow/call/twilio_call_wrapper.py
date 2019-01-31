@@ -7,6 +7,15 @@ import requests
 from twilio.rest import Client as TwilioRestClient
 
 
+class TwilioRecordingURIResponseStatus:
+    """ Possible status when we try to retrieve a recording for a given call
+    """
+    success = "success"
+    call_queued = "call_queued"
+    call_in_progress = "call_in_progress"
+    error = "error"
+
+
 class TwilioCallWrapper(object):
 
     # use echo below to return whatever twiml is sent to it:
@@ -130,3 +139,35 @@ class TwilioCallWrapper(object):
         # -- ends in ".json" which needs to be removed
         # https://www.twilio.com/docs/voice/api/recording#fetch-recording-metadata
         return self.twilio_uri_base + uri_from_recording.split(".json")[0]
+
+    def try_fetch_full_recording_uri(self, call_sid):
+        """ Returns a status and uri for the recording.
+        The status is one of the members of TwilioRecordingURIResponseStatus.
+        The uri is non-empty and valid only if the call has completed.
+        """
+
+        # we will return: status, recording_uri
+        status = TwilioRecordingURIResponseStatus.error
+        recording_uri = ""
+
+        call_status = self.fetch_status(call_sid)
+
+        if call_status == "queued":
+            status = TwilioRecordingURIResponseStatus.call_queued
+
+        elif call_status == "in-progress" or call_status == "ringing":
+            status = TwilioRecordingURIResponseStatus.call_in_progress
+
+        elif call_status == "completed":
+            recordings = self.fetch_recordings(call_sid)
+            if not recordings:
+                status = TwilioRecordingURIResponseStatus.error
+            else:
+                status = TwilioRecordingURIResponseStatus.success
+                recording_uri = self.get_full_recording_uri(recordings[0])
+
+        # else:
+        # nothing to do -- for any other call_status, we report an error
+        # https://www.twilio.com/docs/voice/api/call
+
+        return status, recording_uri
