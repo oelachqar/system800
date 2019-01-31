@@ -1,7 +1,9 @@
 uszipcode
 python-dotenv
-SpeechRecognition
 twilio
 celery
 redis
 flask
+SpeechRecognition
+google-api-python-client
+oauth2client
