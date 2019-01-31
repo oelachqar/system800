@@ -78,11 +78,12 @@ def status(task_id):
 # Celery Tasks
 #
 
-# TODO:
-# - rate limit this task globally (I think Twilio will limit to 1 call
-#   per second anyway, but we may want a lower rate)
-@celery.task(bind=True)
+@celery.task(bind=True, rate_limit=1)
 def call(self, callback_url, ain):
+    """
+        This task is rate limited to 1 request per second because of twilio limitations.
+    """
+
     logger.info(f"Call task got ain = {ain}, callback_url = {callback_url}")
 
     self.update_state(state=State.calling)
