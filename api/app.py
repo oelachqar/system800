@@ -3,6 +3,7 @@ from flask import Flask, flash, render_template, request, jsonify
 from celery import chain
 from celery.exceptions import MaxRetriesExceededError
 from celery.result import AsyncResult
+from celery.utils.log import get_task_logger
 
 from .celery_app import make_celery
 from .state import State
@@ -23,6 +24,7 @@ app.config.update(
     CELERY_RESULT_BACKEND=Config.celery_result_backend,
 )
 celery = make_celery(app, name="app")
+logger = get_task_logger("app")
 
 twilio = TwilioCallWrapper(
     Config.call_twilio_account_sid,
@@ -40,7 +42,7 @@ tts = GoogleTranscriber(
 #
 # Flask Routes
 #
-@app.route("/process", methods=["POST"])
+@app.route("/process", methods=["POST", "GET"])
 def process():
     ain = request.args.get("ain")
     callback_url = request.args.get("callback_url")
@@ -81,13 +83,13 @@ def status(task_id):
 #   per second anyway, but we may want a lower rate)
 @celery.task(bind=True)
 def call(self, callback_url, ain):
-    print(f"Call task got ain = {ain}, callback_url = {callback_url}")
+    logger.info(f"Call task got ain = {ain}, callback_url = {callback_url}")
 
     self.update_state(state=State.calling)
 
     call_sid = twilio.place_and_record_call(ain)
 
-    print(f"Call scheduled, call_sid = {call_sid}")
+    logger.info(f"Call scheduled, call_sid = {call_sid}")
 
     return callback_url, call_sid
 
@@ -100,7 +102,7 @@ def call(self, callback_url, ain):
 @celery.task(bind=True, max_retries=10)
 def get_recording_uri(self, callback_url_and_call_sid):
     callback_url, call_sid = callback_url_and_call_sid
-    print(f"Recording uri task  got callback_url = {callback_url}, call_sid = {call_sid}.")
+    logger.info(f"Recording uri task  got callback_url = {callback_url}, call_sid = {call_sid}.")
 
     status, recording_uri = twilio.try_fetch_full_recording_uri(call_sid)
 
@@ -115,10 +117,10 @@ def get_recording_uri(self, callback_url_and_call_sid):
         or status == TwilioRecordingURIResponseStatus.call_in_progress
     ):
         try:
-            print(f'Status of call {call_sid} is "{status}": trying again')
+            logger.info(f'Status of call {call_sid} is "{status}": trying again')
             self.retry(countdown=10)
         except MaxRetriesExceededError:
-            print(f"Exceeded max retries, giving up")
+            logger.info(f"Exceeded max retries, giving up")
             # clean up
             twilio.delete_call(call_sid)
 
@@ -128,7 +130,7 @@ def get_recording_uri(self, callback_url_and_call_sid):
     # clean up
     twilio.delete_call(call_sid)
 
-    print(f"Got recording_uri = {recording_uri}")
+    logger.info(f"Got recording_uri = {recording_uri}")
     self.update_state(state=State.recording_ready)
 
     assert status == TwilioRecordingURIResponseStatus.success
@@ -138,20 +140,20 @@ def get_recording_uri(self, callback_url_and_call_sid):
 @celery.task(bind=True)
 def transcribe(self, callback_url_and_recording_uri):
     callback_url, recording_uri = callback_url_and_recording_uri
-    print(f"Transcribe task got callback_url = {callback_url}, recording_uri = {recording_uri}.")
+    logger.info(f"Transcribe task got callback_url = {callback_url}, recording_uri = {recording_uri}.")
 
     text = ""
 
     if recording_uri == "":
-        print("Got no recording_uri")
+        logger.info("Got no recording_uri")
         return callback_url, text
 
     self.update_state(state=State.transcribing)
 
     text, status = tts.transcribe_audio_at_uri(recording_uri)
 
-    print(f"Status = {status}")
-    print(f"Transcript = {text}")
+    logger.info(f"Status = {status}")
+    logger.info(f"Transcript = {text}")
     self.update_state(state=State.transcribing_done)
 
     return callback_url, text
@@ -160,17 +162,17 @@ def transcribe(self, callback_url_and_recording_uri):
 @celery.task(bind=True)
 def extract_info(self, callback_url_and_text):
     callback_url, text = callback_url_and_text
-    print(f"Extract got callback_url = {callback_url}, text = {text}.")
+    logger.info(f"Extract got callback_url = {callback_url}, text = {text}.")
     self.update_state(state=State.extracting)
     time.sleep(1)
-    print("Extract done")
+    logger.info("Extract done")
     self.update_state(state=State.extracting_done)
     return "data"
 
 
 @celery.task(bind=True)
 def send_result(self, data):
-    print(f"Sending data {data}.")
+    logger.info(f"Sending data {data}.")
     time.sleep(1)
-    print(f"Sending data {data} done.")
+    logger.info(f"Sending data {data} done.")
     return "data"
