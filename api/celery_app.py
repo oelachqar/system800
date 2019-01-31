@@ -1,9 +1,11 @@
-from celery import Celery, chain
+from celery import Celery
 
 
 def make_celery(app, name):
     celery = Celery(
-        name, backend=app.config["CELERY_RESULT_BACKEND"], broker=app.config["CELERY_BROKER_URL"]
+        name,
+        backend=app.config["CELERY_RESULT_BACKEND"],
+        broker=app.config["CELERY_BROKER_URL"],
     )
     celery.conf.update(app.config)
     TaskBase = celery.Task

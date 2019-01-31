@@ -8,7 +8,7 @@ How run API locally for debugging:
 
 How run celery worker locally for debugging:
 ``` bash
-    celery -A api.app.celery worker --pool=solo --loglevel=INFO -E
+    celery worker -A api.app.celery --pool=solo --loglevel=INFO -E
 ```
 
 How run celery monitoring webapp flower locally:
