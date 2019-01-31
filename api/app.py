@@ -48,11 +48,11 @@ def process():
     callback_url = request.args.get("callback_url")
 
     result = chain(
-        call.s(callback_url, ain),
+        call.s(ain),
         get_recording_uri.s().set(countdown=60),  # delay getting the recording as the call takes time
         transcribe.s(),
         extract_info.s(),
-        send_result.s(),
+        send_result.s(callback_url),
     )()
 
     return jsonify(
@@ -79,12 +79,14 @@ def status(task_id):
 #
 
 @celery.task(bind=True, rate_limit="1/s", track_started=True)
-def call(self, callback_url, ain):
+def call(self, ain):
     """
+        Schedules a call and returns the call sid.
+
         This task is rate limited to 1 request per second because of twilio limitations.
     """
 
-    logger.info(f"Call task got ain = {ain}, callback_url = {callback_url}")
+    logger.info(f"Call task got ain = {ain}")
 
     self.update_state(state=State.calling)
 
@@ -92,7 +94,7 @@ def call(self, callback_url, ain):
 
     logger.info(f"Call scheduled, call_sid = {call_sid}")
 
-    return callback_url, call_sid
+    return call_sid
 
 
 # TODO:
@@ -100,9 +102,11 @@ def call(self, callback_url, ain):
 # - remove asserts
 # - error logging
 @celery.task(bind=True, max_retries=10, retry_backoff=10, retry_jitter=True, track_started=True)
-def get_recording_uri(self, callback_url_and_call_sid):
-    callback_url, call_sid = callback_url_and_call_sid
-    logger.info(f"Recording uri task  got callback_url = {callback_url}, call_sid = {call_sid}.")
+def get_recording_uri(self, call_sid):
+    """ Retrieves the recording uri from a call sid once the call has completed.
+    """
+
+    logger.info(f"Recording uri task call_sid = {call_sid}.")
 
     status, recording_uri = twilio.try_fetch_full_recording_uri(call_sid)
 
@@ -110,7 +114,7 @@ def get_recording_uri(self, callback_url_and_call_sid):
         self.update_state(state=State.error)
 
         assert recording_uri == ""
-        return callback_url, recording_uri
+        return recording_uri
 
     if (
         status == TwilioRecordingURIResponseStatus.call_queued
@@ -125,7 +129,7 @@ def get_recording_uri(self, callback_url_and_call_sid):
             twilio.delete_call(call_sid)
 
             assert recording_uri == ""
-            return callback_url, recording_uri
+            return recording_uri
 
     # clean up
     twilio.delete_call(call_sid)
@@ -134,19 +138,21 @@ def get_recording_uri(self, callback_url_and_call_sid):
     self.update_state(state=State.recording_ready)
 
     assert status == TwilioRecordingURIResponseStatus.success
-    return callback_url, recording_uri
+    return recording_uri
 
 
 @celery.task(bind=True, track_started=True)
-def transcribe(self, callback_url_and_recording_uri):
-    callback_url, recording_uri = callback_url_and_recording_uri
-    logger.info(f"Transcribe task got callback_url = {callback_url}, recording_uri = {recording_uri}.")
+def transcribe(self, recording_uri):
+    """ Returns a transcription of the audio at the given uri.
+    """
+
+    logger.info(f"Transcribe task got recording_uri = {recording_uri}.")
 
     text = ""
 
     if recording_uri == "":
         logger.info("Got no recording_uri")
-        return callback_url, text
+        return text
 
     self.update_state(state=State.transcribing)
 
@@ -156,13 +162,12 @@ def transcribe(self, callback_url_and_recording_uri):
     logger.info(f"Transcript = {text}")
     self.update_state(state=State.transcribing_done)
 
-    return callback_url, text
+    return text
 
 
 @celery.task(bind=True, track_started=True)
-def extract_info(self, callback_url_and_text):
-    callback_url, text = callback_url_and_text
-    logger.info(f"Extract got callback_url = {callback_url}, text = {text}.")
+def extract_info(self, text):
+    logger.info(f"Extract got text = {text}.")
     self.update_state(state=State.extracting)
     time.sleep(1)
     logger.info("Extract done")
@@ -171,8 +176,8 @@ def extract_info(self, callback_url_and_text):
 
 
 @celery.task(bind=True)
-def send_result(self, data):
-    logger.info(f"Sending data {data}.")
+def send_result(self, data, callback_url):
+    logger.info(f"Send task got callback_url = {callback_url}, data = {data}.")
     time.sleep(1)
     logger.info(f"Sending data {data} done.")
     return "data"
