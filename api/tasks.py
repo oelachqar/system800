@@ -6,10 +6,9 @@ from celery.utils.log import get_task_logger
 
 from config import Config
 
-from workflow.call.twilio_call_wrapper import (
-    TwilioCallWrapper,
-    TwilioRecordingURIResponseStatus,
-)
+from workflow.call.twilio_call_wrapper import TwilioCallWrapper
+from twilio.rest.api.v2010.account.call import CallInstance
+
 from workflow.transcribe.google_tts import GoogleTranscriber
 from workflow.transcribe.tts_status import TranscriptionStatus
 
@@ -25,6 +24,8 @@ twilio = TwilioCallWrapper(
     Config.call_number_to_call,
     Config.call_twilio_local_number,
 )
+
+TwilioCallStatus = CallInstance.Status
 
 tts = GoogleTranscriber(
     Config.google_credentials_json, None
@@ -61,35 +62,66 @@ class PullRecording(Task):
     retry_jitter = True
     track_started = True
 
+    failed_call_states = [
+        TwilioCallStatus.BUSY,
+        TwilioCallStatus.FAILED,
+        TwilioCallStatus.NO_ANSWER,
+        TwilioCallStatus.CANCELED,
+    ]
+
+    in_progress_call_states = [
+        TwilioCallStatus.QUEUED,
+        TwilioCallStatus.RINGING,
+        TwilioCallStatus.IN_PROGRESS,
+    ]
+
     def run(self, call_sid):
-        logger.info(f"Recording uri task call_sid = {call_sid}.")
+        status = twilio.fetch_status(call_sid)
+        logger.info(f'Status of call {call_sid} is "{status}"')
 
-        status, recording_uri = twilio.try_fetch_full_recording_uri(call_sid)
+        recording_uri = ""
 
-        if status == TwilioRecordingURIResponseStatus.error:
+        if status in self.failed_call_states:
             self.update_state(state=State.error)
 
-            assert recording_uri == ""
             return call_sid, recording_uri
 
-        if (
-            status == TwilioRecordingURIResponseStatus.call_queued
-            or status == TwilioRecordingURIResponseStatus.call_in_progress
-        ):
+        if status in self.in_progress_call_states:
             try:
-                logger.info(f'Status of call {call_sid} is "{status}": trying again')
+                logger.info("Will retry")
                 self.retry(countdown=10)
+
             except MaxRetriesExceededError:
                 logger.info(f"Exceeded max retries, giving up")
+                self.update_state(state=State.error)
 
-                assert recording_uri == ""
                 return call_sid, recording_uri
 
-        logger.info(f"Got recording_uri = {recording_uri}")
-        self.update_state(state=State.recording_ready)
+        # the only other status we expect is completed
+        if status != TwilioCallStatus.COMPLETED:
+            # treat unexpected status as an error
+            logger.error(f'Unexpected call status: "{status}"')
 
-        assert status == TwilioRecordingURIResponseStatus.success
-        return call_sid, recording_uri
+            self.update_state(state=State.error)
+
+            return call_sid, recording_uri
+
+        # call has completed, find the recording uri
+        recordings = twilio.fetch_recordings(call_sid)
+        if not recordings:
+            logger.error(f"Call {call_sid} completed with no recording")
+
+            self.update_state(state=State.error)
+
+            return call_sid, recording_uri
+
+        else:
+            recording_uri = twilio.get_full_recording_uri(recordings[0])
+            logger.info(f"Got recording_uri = {recording_uri}")
+
+            self.update_state(state=State.recording_ready)
+
+            return call_sid, recording_uri
 
 
 # class DeleteRecordings(Task):
