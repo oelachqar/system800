@@ -20,7 +20,8 @@ logger = get_task_logger("app")
 twilio = TwilioCallWrapper(
     Config.call_twilio_account_sid,
     Config.call_twilio_auth_token,
-    Config.call_max_length_secs,
+    Config.call_initial_pause_secs,
+    Config.call_final_pause_secs,
     Config.call_number_to_call,
     Config.call_twilio_local_number,
 )

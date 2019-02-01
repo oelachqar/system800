@@ -21,7 +21,8 @@ class TwilioCallWrapper(object):
     # use echo below to return whatever twiml is sent to it:
     # https://www.twilio.com/labs/twimlets/echo
     # we will specify the digits and length below
-    twiml_url = "http://twimlets.com/echo?Twiml=%3CResponse%3E%0A%3CPlay%20digits%3D%22{digits}%22%2F%3E%0A%3CPause%20length%3D%22{length}%22%2F%3E%0A%3CHangup%2F%3E%0A%3C%2FResponse%3E&"
+    # note: when specifying twim_url, replace '%7B' with '{' and '%7D' with '}'
+    twiml_url = "http://twimlets.com/echo?Twiml=%3C%3Fxml%20version%3D%221.0%22%3F%3E%0A%3CResponse%3E%0A%3CPause%20length%3D%22{pauseBeforeSendingDigitsLength}%22%2F%3E%0A%3CPlay%20digits%3D%22{digits}%22%2F%3E%0A%3CPause%20length%3D%22{pauseAfterSendingDigitsLength}%22%2F%3E%0A%3CHangup%2F%3E%0A%0A%3C%2FResponse%3E&"
 
     # base is mentioned here: https://www.twilio.com/docs/voice/api/recording
     twilio_uri_base = "https://api.twilio.com"
@@ -30,9 +31,10 @@ class TwilioCallWrapper(object):
     # https://www.twilio.com/docs/voice/api/call
     # https://www.twilio.com/docs/voice/api/recording
 
-    def __init__(self, twilio_account_sid, twilio_auth_token, call_max_length_secs, number_to_call, twilio_local_number):
+    def __init__(self, twilio_account_sid, twilio_auth_token, call_initial_pause_secs, call_final_pause_secs, number_to_call, twilio_local_number):
         self._client = TwilioRestClient(twilio_account_sid, twilio_auth_token)
-        self.call_max_length_secs = call_max_length_secs
+        self.call_initial_pause_secs = call_initial_pause_secs
+        self.call_final_pause_secs = call_final_pause_secs
         self.number_to_call = number_to_call
         self.twilio_local_number = twilio_local_number
 
@@ -84,7 +86,9 @@ class TwilioCallWrapper(object):
         send_digits = self.build_dtmf_sequence(case_number)
 
         twiml_url = self.twiml_url.format(
-            digits=send_digits, length=self.call_max_length_secs)
+            pauseBeforeSendingDigitsLength=self.call_initial_pause_secs,
+            digits=send_digits,
+            pauseAfterSendingDigitsLength=self.call_final_pause_secs)
 
         call = self._client.calls.create(
             to=self.number_to_call, from_=self.twilio_local_number, url=twiml_url, record=True)

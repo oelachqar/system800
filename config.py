@@ -12,7 +12,8 @@ class Config(object):
     call_twilio_auth_token = os.getenv("CALL_TWILIO_AUTH_TOKEN")
     call_twilio_local_number = os.getenv("CALL_TWILIO_LOCAL_NUMBER")
     call_number_to_call = os.getenv("CALL_NUMBER_TO_CALL")
-    call_max_length_secs = os.getenv("CALL_MAX_LENGTH_SECS") or 45
+    call_final_pause_secs = os.getenv("CALL_FINAL_PAUSE") or 45 
+    call_initial_pause_secs = os.getenv("CALL_INITIAL_PAUSE") 
 
     # tts config
     google_credentials_json = os.getenv("GOOGLE_CREDENTIALS_JSON")
