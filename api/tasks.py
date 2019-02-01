@@ -11,6 +11,7 @@ from workflow.call.twilio_call_wrapper import (
     TwilioRecordingURIResponseStatus,
 )
 from workflow.transcribe.google_tts import GoogleTranscriber
+from workflow.transcribe.tts_status import TranscriptionStatus
 
 from .state import State
 
@@ -68,7 +69,7 @@ class PullRecording(Task):
             self.update_state(state=State.error)
 
             assert recording_uri == ""
-            return recording_uri
+            return call_sid, recording_uri
 
         if (
             status == TwilioRecordingURIResponseStatus.call_queued
@@ -79,20 +80,28 @@ class PullRecording(Task):
                 self.retry(countdown=10)
             except MaxRetriesExceededError:
                 logger.info(f"Exceeded max retries, giving up")
-                # clean up
-                twilio.delete_call(call_sid)
 
                 assert recording_uri == ""
-                return recording_uri
-
-        # clean up
-        twilio.delete_call(call_sid)
+                return call_sid, recording_uri
 
         logger.info(f"Got recording_uri = {recording_uri}")
         self.update_state(state=State.recording_ready)
 
         assert status == TwilioRecordingURIResponseStatus.success
-        return recording_uri
+        return call_sid, recording_uri
+
+
+# class DeleteRecordings(Task):
+#     """ Deletes all recordings associated to a given call sid.
+#     """
+
+#     def run(self, call_sid):
+#         logger.info(f"Delelte recordings task got call_sid = {call_sid}.")
+
+#         call = twilio.fetch_call(call_sid)
+
+#         for recording in call.recordings.list():
+#             recording.delete()
 
 
 class TranscribeCall(Task):
@@ -101,22 +110,44 @@ class TranscribeCall(Task):
 
     track_started = True
 
-    def run(self, recording_uri):
-        logger.info(f"Transcribe task got recording_uri = {recording_uri}.")
+    def run(self, call_sid_and_recording_uri):
+        call_sid, recording_uri = call_sid_and_recording_uri
+        logger.info(
+            f"Transcribe task got call_sid = {call_sid}, recording_uri = {recording_uri}."
+        )
 
         text = ""
 
         if recording_uri == "":
             logger.info("Got no recording_uri")
-            return text
 
-        self.update_state(state=State.transcribing)
+        else:
+            self.update_state(state=State.transcribing)
 
-        text, status = tts.transcribe_audio_at_uri(recording_uri)
+            try:
+                transcript, status = tts.transcribe_audio_at_uri(recording_uri)
 
-        logger.info(f"Status = {status}")
-        logger.info(f"Transcript = {text}")
-        self.update_state(state=State.transcribing_done)
+                logger.info(f"Transcribe status = {status}")
+                logger.info(f"Transcript = {transcript}")
+
+                if status == TranscriptionStatus.success:
+                    text = transcript
+                    self.update_state(state=State.transcribing_done)
+
+                else:
+                    self.update_state(state=State.transcribing_failed)
+
+            except Exception as err:
+                logger.error(f"Transcription error: {err}")
+                self.update_state(state=State.transcribing_failed)
+
+        # ideally call DeleteRecordings above, not sure if that's possible
+        # with class based tasks so doing it synchronously for now
+
+        # finished with recording, so delete it from storage
+        call = twilio.fetch_call(call_sid)
+        for recording in call.recordings.list():
+            recording.delete()
 
         return text
 
