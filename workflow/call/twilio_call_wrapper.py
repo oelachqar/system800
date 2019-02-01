@@ -23,7 +23,7 @@ class TwilioCallWrapper(object):
     # we will specify the digits and length below
     # note: when specifying twim_url, replace '%7B' with '{' and '%7D' with '}'
     twiml_url = "http://twimlets.com/echo?Twiml=%3C%3Fxml%20version%3D%221.0%22%3F%3E%0A%3CResponse%3E%0A%3CPause%20length%3D%22{pauseBeforeSendingDigitsLength}%22%2F%3E%0A%3CPlay%20digits%3D%22{digits}%22%2F%3E%0A%3CPause%20length%3D%22{pauseAfterSendingDigitsLength}%22%2F%3E%0A%3CHangup%2F%3E%0A%0A%3C%2FResponse%3E&"
- 
+
     # base is mentioned here: https://www.twilio.com/docs/voice/api/recording
     twilio_uri_base = "https://api.twilio.com"
 
@@ -87,7 +87,7 @@ class TwilioCallWrapper(object):
 
         twiml_url = self.twiml_url.format(
             pauseBeforeSendingDigitsLength=self.call_initial_pause_secs,
-            digits=send_digits, 
+            digits=send_digits,
             pauseAfterSendingDigitsLength=self.call_final_pause_secs)
 
         call = self._client.calls.create(
