@@ -1,11 +1,10 @@
 
 import calendar
-from collections import OrderedDict
 import dateutil.parser as dparser
 from datetime import datetime
 import re
 
-from extract.utils import years_to_digits, ordinals_to_ordinals, hour_with_min_to_time, wordnums_to_nums, replace_homonyms
+from workflow.extract.utils import years_to_digits, ordinals_to_ordinals, hour_with_min_to_time, wordnums_to_nums, replace_homonyms
 
 
 #not used by Google
@@ -48,7 +47,7 @@ def get_re_for_date_parsing():
     """
     months = list(map(lambda x: x.lower(), list(calendar.month_name)[1:])) # py 3
     months_or = '|'.join(months)
-    return r"(?=((?:{months_or}) .*? (?:a\.m\.|p\.m\.)))".format(**locals())
+    return r"(?=((?:{months_or}) .*? (?:a\.m\.|p\.m\.|am|pm)))".format(**locals())
 
 
 def find_possible_date_times(s, words_to_nums):
@@ -87,12 +86,21 @@ def extract_date_time_base(s, words_to_nums=False):
 
     Loops through possible dates, returns as soon as dparser succeeds in
     parsing date.
+    
+    The parser seems to always return something, e.g. 
+    'on march 2021 at 4:30 pm' -->
+    {'year': 2021, 'month': 3, 'day': 2, 'hour': 16, 'minute': 30}
+    even though 'day' should be None.
+
+    We get around this problem by adding two different defaults and checking if the dict returned are the same.
+    
+
     """
     possible_dates = find_possible_date_times(s, words_to_nums)
     default_1 = datetime(1900, 1, 1, 0, 0)
     default_2 = datetime(1999, 12, 25, 23, 0)
     fields = ['year', 'month', 'day', 'hour', 'minute']
-    d = OrderedDict()
+    d = {}
     for field in fields:
         d[field] = None
     for date in possible_dates:
@@ -100,16 +108,12 @@ def extract_date_time_base(s, words_to_nums=False):
             dt_1 = dparser.parse(date, default=default_1)
             dt_2 = dparser.parse(date, default=default_2)
             #populate dictionary with date info
-            different = 0 #flags if dt_1 different than dt_2
             for key in d:
                 if dt_1.__getattribute__(key) == dt_2.__getattribute__(key):
                     d[key] = dt_1.__getattribute__(key)
                 else:
                 	different = 1
             d["minute"] = dt_1.minute
-
-            if not different: #  if dt_1 == dt_2, create datetime column
-            	d["datetime"] = dt_1
             return d
         except:
             pass
