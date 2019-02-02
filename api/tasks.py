@@ -12,6 +12,8 @@ from workflow.call.twilio_call_wrapper import (
 )
 from workflow.transcribe.google_tts import GoogleTranscriber
 
+from workflow.extract import date_info
+
 from .state import State
 
 logger = get_task_logger("app")
@@ -128,6 +130,8 @@ class ExtractInfo(Task):
     def run(self, text):
         logger.info(f"Extract got text = {text}.")
         self.update_state(state=State.extracting)
+        date = date_info.extract_date_time(text)
+        logger.info(f"Date = {date}")
         time.sleep(1)
         logger.info("Extract done")
         self.update_state(state=State.extracting_done)

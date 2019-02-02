@@ -47,7 +47,7 @@ def get_re_for_date_parsing():
     """
     months = list(map(lambda x: x.lower(), list(calendar.month_name)[1:])) # py 3
     months_or = '|'.join(months)
-    return r"(?=((?:{months_or}) .*? (?:AM|PM)))".format(**locals())
+    return r"(?=((?:{months_or}) .*? (?:am|pm)))".format(**locals())
 
 
 def find_possible_date_times(s):
@@ -113,6 +113,7 @@ def extract_date_time(s):
     """ If extract_date_time_base doesn't succeed, try again having replaced
     homonyms.
     """
+    s=s.lower()
     return (extract_date_time_base(s) or
             extract_date_time_base(utils.replace_homonyms(s)) or
             {'year': None, 'month': None, 'day': None,

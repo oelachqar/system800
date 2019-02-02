@@ -27,6 +27,8 @@ class MyTest(unittest.TestCase):
         self.assertDictEqual(date_info.extract_date_time('judge may smith at address involving march and twenty third st '
          'on march third two thousand twenty one at one forty five AM'), 
          {'year': 2021, 'month': 3, 'day': 3, 'hour': 1, 'minute': 45})
+    def test_realReturn(self):
+        print(date_info.extract_date_time("April 3rd, 2021 at 1 PM "))
 
 
 if __name__ == "__main__":
