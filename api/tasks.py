@@ -204,7 +204,7 @@ class ExtractInfo(Task):
 class SendResult(Task):
     track_started = True
 
-    def run(self, callback_url, data):
+    def run(self, data, callback_url):
         logger.info(f"Send task got callback_url = {callback_url}, data = {data}.")
         time.sleep(1)
         logger.info(f"Sending data {data} done.")
