@@ -55,7 +55,7 @@ def send_error(request, exc, traceback, ain, callback_url):
     # Return the outer id (same that we returned initially).
     # We assume here that all tasks using this error handler take outer_task_id
     # as a keyword argument.
-    data["id"] = request.kwargs.get("outer_task_id", "")
+    data["task_id"] = request.kwargs.get("outer_task_id", "")
 
     logger.info(f"Sending error data: {data} to {callback_url}")
 
@@ -120,10 +120,8 @@ def process():
 
     return jsonify(
         {
-            "id": result.id,
             "ain": ain,
             "task_id": result.task_id,
-            "status": result.status,
             "state": result.state,
         }
     )
@@ -134,5 +132,5 @@ def status(task_id):
     result = AsyncResult(task_id)
 
     return jsonify(
-        {"task_id": result.task_id, "status": result.status, "state": result.state}
+        {"task_id": result.task_id, "state": result.state}
     )
