@@ -12,7 +12,7 @@ from twilio.rest.api.v2010.account.call import CallInstance
 from workflow.transcribe.google_tts import GoogleTranscriber
 from workflow.transcribe.tts_status import TranscriptionStatus
 
-from workflow.extract import date_info_Google, location_info_Google
+from workflow.extract import date_info, location_info
 
 from .state import State
 
@@ -194,9 +194,9 @@ class ExtractInfo(Task):
         logger.info(f"Extract got text = {text}.")
         self.update_state(task_id=outer_task_id, state=State.extracting)
         d = {}
-        date = date_info_Google.extract_date_time(text)
+        date = date_info.extract_date_time(text)
         d.update(date)
-        location = location_info_Google.extract_location(text)
+        location = location_info.extract_location(text)
         d.update(location)
         logger.info(f"Date = {date}")
         logger.info(f"Location = {location}")
