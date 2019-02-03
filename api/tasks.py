@@ -6,13 +6,12 @@ from celery.utils.log import get_task_logger
 
 from config import Config
 
-from workflow.call.twilio_call_wrapper import TwilioCallWrapper
 from twilio.rest.api.v2010.account.call import CallInstance
 
+from workflow.call.twilio_call_wrapper import TwilioCallWrapper
+from workflow.extract import date_info, location_info
 from workflow.transcribe.google_tts import GoogleTranscriber
 from workflow.transcribe.tts_status import TranscriptionStatus
-
-from workflow.extract import date_info, location_info
 
 from .state import State
 
@@ -154,7 +153,8 @@ class TranscribeCall(Task):
     def run(self, call_sid_and_recording_uri, *, outer_task_id):
         call_sid, recording_uri = call_sid_and_recording_uri
         logger.info(
-            f"Transcribe task got call_sid = {call_sid}, recording_uri = {recording_uri}."
+            f"Transcribe task got call_sid = {call_sid}, "
+            f"recording_uri = {recording_uri}."
         )
 
         text = ""
