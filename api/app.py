@@ -46,10 +46,14 @@ def send_error(request, exc, traceback, ain, callback_url):
     Got an error when trying to define this as a class based task
     """
     data = {}
-    data["failed_task"] = request.task
+    data["failed_task"] = request.task  # the celery task name
     data["exception"] = str(exc)
     data["traceback"] = traceback
     data["ain"] = ain
+    # Return the outer id (same that we returned initially).
+    # We assume here that all tasks using this error handler take outer_task_id
+    # as a keyword argument.
+    data["id"] = request.kwargs.get("outer_task_id", "")
 
     logger.info(f"Sending error data: {data} to {callback_url}")
 
