@@ -1,5 +1,3 @@
-import time
-
 from api.state import State
 
 from celery import Task
@@ -7,6 +5,8 @@ from celery.exceptions import MaxRetriesExceededError
 from celery.utils.log import get_task_logger
 
 from config import Config
+
+import requests
 
 from twilio.rest.api.v2010.account.call import CallInstance
 
@@ -218,6 +218,6 @@ class SendResult(Task):
         logger.info(
             f"Send task got ain = {ain}, callback_url = {callback_url}, data = {data}."
         )
-        time.sleep(1)
+        requests.post(callback_url, json=data)
         logger.info(f"Sending data {data} done.")
-        return "data"
+        return data

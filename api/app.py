@@ -134,3 +134,12 @@ def status(task_id):
     return jsonify(
         {"task_id": result.task_id, "state": result.state}
     )
+
+
+@app.route("/callback", methods=['POST'])
+def debug_callback():
+    if not request.is_json:
+        return '', 400
+
+    print(request.get_json())
+    return '', 200
