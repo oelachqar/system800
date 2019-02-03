@@ -193,13 +193,16 @@ class ExtractInfo(Task):
     def run(self, text):
         logger.info(f"Extract got text = {text}.")
         self.update_state(state=State.extracting)
+        d = {}
         date = date_info_Google.extract_date_time(text)
+        d.update(date)
         location = location_info_Google.extract_location(text)
+        d.update(location)
         logger.info(f"Date = {date}")
         logger.info(f"Location = {location}")
         logger.info("Extract done")
         self.update_state(state=State.extracting_done)
-        return location.update(date)
+        return d
 
 
 class SendResult(Task):
