@@ -200,10 +200,13 @@ class ExtractInfo(Task):
         logger.info(f"Extract got text = {text}.")
         self.update_state(task_id=outer_task_id, state=State.extracting)
         d = {}
+        # TODO: raise error if extraction fails ?
         date = date_info.extract_date_time(text)
-        d.update(date)
+        if date is not None:
+            d.update(date)
         location = location_info.extract_location(text)
-        d.update(location)
+        if location is not None:
+            d.update(location)
         logger.info(f"Date = {date}")
         logger.info(f"Location = {location}")
         logger.info("Extract done")
