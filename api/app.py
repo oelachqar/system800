@@ -18,6 +18,8 @@ from config import Config
 
 from flask import Flask, jsonify, request
 
+import requests
+
 
 #
 # Init apps
@@ -57,6 +59,7 @@ def send_error(request, exc, traceback, ain, callback_url):
     data["task_id"] = request.kwargs.get("outer_task_id", "")
 
     logger.info(f"Sending error data: {data} to {callback_url}")
+    requests.post(callback_url, json=data)
 
 
 @celery.task()
@@ -136,7 +139,7 @@ def status(task_id):
     )
 
 
-@app.route("/callback", methods=['POST'])
+@app.route("/debug_callback", methods=['POST'])
 def debug_callback():
     if not request.is_json:
         return '', 400
