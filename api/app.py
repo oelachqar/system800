@@ -6,7 +6,15 @@ from config import Config
 from flask import Flask, jsonify, request
 
 from .celery_app import make_celery
-from .tasks import ExtractInfo, InitiateCall, PullRecording, SendResult, TranscribeCall
+
+from .tasks import (
+    ExtractInfo,
+    InitiateCall,
+    PullRecording,
+    SendResult,
+    TranscribeCall,
+    logger,
+)
 
 
 #
@@ -25,6 +33,25 @@ extract_info = celery.register_task(ExtractInfo())
 transcribe = celery.register_task(TranscribeCall())
 send_result = celery.register_task(SendResult())
 
+
+@celery.task()
+def send_error(request, exc, traceback, ain, callback_url):
+    """
+    Inform caller of errors.
+    Using the link_error example here which explains first 3 arguments:
+    http://docs.celeryproject.org/en/latest/userguide/canvas.html#chains
+
+    Got an error when trying to define this as a class based task
+    """
+    data = {}
+    data["failed_task"] = request.task
+    data["exception"] = str(exc)
+    data["traceback"] = traceback
+    data["ain"] = ain
+
+    logger.info(f"Sending error data: {data} to {callback_url}")
+
+
 #
 # Flask Routes
 #
@@ -32,15 +59,15 @@ send_result = celery.register_task(SendResult())
 def process():
     ain = request.args.get("ain")
     callback_url = request.args.get("callback_url")
-
     result = chain(
-        call.s(ain),
+        call.s(ain).set(link_error=send_error.s(ain, callback_url)),
         get_recording_uri.s().set(
-            countdown=60
-        ),  # delay getting the recording as the call takes time
-        transcribe.s(),
-        extract_info.s(),
-        send_result.s(callback_url),
+            countdown=60,  # delay getting the recording as the call takes time
+            link_error=send_error.s(ain, callback_url),
+        ),
+        transcribe.s().set(link_error=send_error.s(ain, callback_url)),
+        extract_info.s().set(link_error=send_error.s(ain, callback_url)),
+        send_result.s(ain, callback_url),
     )()
 
     return jsonify(
