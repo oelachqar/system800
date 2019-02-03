@@ -91,6 +91,10 @@ def process():
     *: after failure, we invoke send_error to inform caller of error
     """
 
+    # TODO
+    # add extra error handlers to ensure recordings deleted if get_recording_uri
+    # or transcribe fail
+
     result = chain(
         call.s(ain, outer_task_id=task_id).set(
             link_error=send_error.s(ain, callback_url)

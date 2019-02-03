@@ -144,6 +144,11 @@ class TranscribeCall(Task):
     """ Returns a transcription of the audio at the given uri.
     """
 
+    # TODO
+    # Ensure we only send < 1 min of audio to be transcribed -- otherwise we
+    # need to make an async call to the tts service (and not use speech rec
+    # package).
+
     track_started = True
 
     def run(self, call_sid_and_recording_uri, *, outer_task_id):
@@ -168,14 +173,20 @@ class TranscribeCall(Task):
 
                 if status == TranscriptionStatus.success:
                     text = transcript
-                    self.update_state(task_id=outer_task_id, state=State.transcribing_done)
+                    self.update_state(
+                        task_id=outer_task_id, state=State.transcribing_done
+                    )
 
                 else:
-                    self.update_state(task_id=outer_task_id, state=State.transcribing_failed)
+                    self.update_state(
+                        task_id=outer_task_id, state=State.transcribing_failed
+                    )
 
             except Exception as err:
                 logger.error(f"Transcription error: {err}")
-                self.update_state(task_id=outer_task_id, state=State.transcribing_failed)
+                self.update_state(
+                    task_id=outer_task_id, state=State.transcribing_failed
+                )
 
         return call_sid, text
 
@@ -203,7 +214,9 @@ class SendResult(Task):
     track_started = True
 
     def run(self, data, ain, callback_url, *, outer_task_id):
-        logger.info(f"Send task got ain = {ain}, callback_url = {callback_url}, data = {data}.")
+        logger.info(
+            f"Send task got ain = {ain}, callback_url = {callback_url}, data = {data}."
+        )
         time.sleep(1)
         logger.info(f"Sending data {data} done.")
         return "data"
