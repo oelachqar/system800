@@ -1,6 +1,6 @@
 from uuid import uuid4
 
-from celery import chain
+from celery import chain, group
 from celery.result import AsyncResult
 
 from config import Config
@@ -10,6 +10,7 @@ from flask import Flask, jsonify, request
 from .celery_app import make_celery
 
 from .tasks import (
+    DeleteRecordings,
     ExtractInfo,
     InitiateCall,
     PullRecording,
@@ -34,6 +35,7 @@ get_recording_uri = celery.register_task(PullRecording())
 extract_info = celery.register_task(ExtractInfo())
 transcribe = celery.register_task(TranscribeCall())
 send_result = celery.register_task(SendResult())
+delete_recordings = celery.register_task(DeleteRecordings())
 
 
 @celery.task()
@@ -58,6 +60,16 @@ def send_error(request, exc, traceback, ain, callback_url):
     logger.info(f"Sending error data: {data} to {callback_url}")
 
 
+@celery.task()
+def dummy_task(ain, callback_url, outer_task_id):
+    """ So that we can an assign a task id to a workflow containing a group
+    """
+    logger.info(
+        f"All tasks for ain: {ain}, callback_url: {callback_url}, task_id: {outer_task_id} done."
+    )
+    return None
+
+
 #
 # Flask Routes
 #
@@ -70,6 +82,15 @@ def process():
     # state
     task_id = str(uuid4())
 
+    """
+    Workflow:
+    schedule_call* -- check_call_done* -- transcribe* -- extract* -- send
+                                               |                      |
+                                          delete_recording  -------  dummy
+
+    *: after failure, we invoke send_error to inform caller of error
+    """
+
     result = chain(
         call.s(ain, outer_task_id=task_id).set(
             link_error=send_error.s(ain, callback_url)
@@ -81,10 +102,16 @@ def process():
         transcribe.s(outer_task_id=task_id).set(
             link_error=send_error.s(ain, callback_url)
         ),
-        extract_info.s(outer_task_id=task_id).set(
-            link_error=send_error.s(ain, callback_url)
+        group(
+            chain(
+                extract_info.s(outer_task_id=task_id).set(
+                    link_error=send_error.s(ain, callback_url)
+                ),
+                send_result.s(ain, callback_url, outer_task_id=task_id),
+            ),
+            delete_recordings.s(),
         ),
-        send_result.s(ain, callback_url, outer_task_id=task_id),
+        dummy_task.si(ain, callback_url, outer_task_id=task_id),
     ).apply_async(task_id=task_id)
 
     return jsonify(

@@ -126,17 +126,18 @@ class PullRecording(Task):
             return call_sid, recording_uri
 
 
-# class DeleteRecordings(Task):
-#     """ Deletes all recordings associated to a given call sid.
-#     """
+class DeleteRecordings(Task):
+    """ Deletes all recordings associated to a given call sid.
+    """
 
-#     def run(self, call_sid):
-#         logger.info(f"Delelte recordings task got call_sid = {call_sid}.")
+    def run(self, call_sid_and_text):
+        call_sid, _ = call_sid_and_text
+        logger.info(f"Delete recordings task got call_sid = {call_sid}.")
 
-#         call = twilio.fetch_call(call_sid)
+        call = twilio.fetch_call(call_sid)
 
-#         for recording in call.recordings.list():
-#             recording.delete()
+        for recording in call.recordings.list():
+            recording.delete()
 
 
 class TranscribeCall(Task):
@@ -176,21 +177,14 @@ class TranscribeCall(Task):
                 logger.error(f"Transcription error: {err}")
                 self.update_state(task_id=outer_task_id, state=State.transcribing_failed)
 
-        # ideally call DeleteRecordings above, not sure if that's possible
-        # with class based tasks so doing it synchronously for now
-
-        # finished with recording, so delete it from storage
-        call = twilio.fetch_call(call_sid)
-        for recording in call.recordings.list():
-            recording.delete()
-
-        return text
+        return call_sid, text
 
 
 class ExtractInfo(Task):
     track_started = True
 
-    def run(self, text, *, outer_task_id):
+    def run(self, call_sid_and_text, *, outer_task_id):
+        _, text = call_sid_and_text
         logger.info(f"Extract got text = {text}.")
         self.update_state(task_id=outer_task_id, state=State.extracting)
         d = {}
