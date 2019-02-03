@@ -1,5 +1,7 @@
 import time
 
+from api.state import State
+
 from celery import Task
 from celery.exceptions import MaxRetriesExceededError
 from celery.utils.log import get_task_logger
@@ -13,7 +15,6 @@ from workflow.extract import date_info, location_info
 from workflow.transcribe.google_tts import GoogleTranscriber
 from workflow.transcribe.tts_status import TranscriptionStatus
 
-from .state import State
 
 logger = get_task_logger("app")
 

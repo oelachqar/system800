@@ -1,14 +1,7 @@
 from uuid import uuid4
 
-from celery import chain, group
-from celery.result import AsyncResult
-
-from config import Config
-
-from flask import Flask, jsonify, request
-
-from .celery_app import make_celery
-from .tasks import (
+from api.celery_app import make_celery
+from api.tasks import (
     DeleteRecordings,
     ExtractInfo,
     InitiateCall,
@@ -17,6 +10,13 @@ from .tasks import (
     TranscribeCall,
     logger,
 )
+
+from celery import chain, group
+from celery.result import AsyncResult
+
+from config import Config
+
+from flask import Flask, jsonify, request
 
 
 #
