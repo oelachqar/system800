@@ -8,7 +8,6 @@ from config import Config
 from flask import Flask, jsonify, request
 
 from .celery_app import make_celery
-
 from .tasks import (
     DeleteRecordings,
     ExtractInfo,
@@ -65,7 +64,8 @@ def dummy_task(ain, callback_url, outer_task_id):
     """ So that we can an assign a task id to a workflow containing a group
     """
     logger.info(
-        f"All tasks for ain: {ain}, callback_url: {callback_url}, task_id: {outer_task_id} done."
+        f"All tasks for ain: {ain}, callback_url: {callback_url}, "
+        f"task_id: {outer_task_id} done."
     )
     return None
 
