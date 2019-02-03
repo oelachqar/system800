@@ -43,10 +43,10 @@ class InitiateCall(Task):
     rate_limit = "1/s"
     track_started = True
 
-    def run(self, ain):
+    def run(self, ain, *, outer_task_id):
         logger.info(f"Call task got ain = {ain}")
 
-        self.update_state(state=State.calling)
+        self.update_state(task_id=outer_task_id, state=State.calling)
 
         call_sid = twilio.place_and_record_call(ain)
 
@@ -77,14 +77,14 @@ class PullRecording(Task):
         TwilioCallStatus.IN_PROGRESS,
     ]
 
-    def run(self, call_sid):
+    def run(self, call_sid, *, outer_task_id):
         status = twilio.fetch_status(call_sid)
         logger.info(f'Status of call {call_sid} is "{status}"')
 
         recording_uri = ""
 
         if status in self.failed_call_states:
-            self.update_state(state=State.error)
+            self.update_state(task_id=outer_task_id, state=State.error)
 
             return call_sid, recording_uri
 
@@ -95,7 +95,7 @@ class PullRecording(Task):
 
             except MaxRetriesExceededError:
                 logger.info(f"Exceeded max retries, giving up")
-                self.update_state(state=State.error)
+                self.update_state(task_id=outer_task_id, state=State.error)
 
                 return call_sid, recording_uri
 
@@ -104,7 +104,7 @@ class PullRecording(Task):
             # treat unexpected status as an error
             logger.error(f'Unexpected call status: "{status}"')
 
-            self.update_state(state=State.error)
+            self.update_state(task_id=outer_task_id, state=State.error)
 
             return call_sid, recording_uri
 
@@ -113,7 +113,7 @@ class PullRecording(Task):
         if not recordings:
             logger.error(f"Call {call_sid} completed with no recording")
 
-            self.update_state(state=State.error)
+            self.update_state(task_id=outer_task_id, state=State.error)
 
             return call_sid, recording_uri
 
@@ -121,7 +121,7 @@ class PullRecording(Task):
             recording_uri = twilio.get_full_recording_uri(recordings[0])
             logger.info(f"Got recording_uri = {recording_uri}")
 
-            self.update_state(state=State.recording_ready)
+            self.update_state(task_id=outer_task_id, state=State.recording_ready)
 
             return call_sid, recording_uri
 
@@ -145,7 +145,7 @@ class TranscribeCall(Task):
 
     track_started = True
 
-    def run(self, call_sid_and_recording_uri):
+    def run(self, call_sid_and_recording_uri, *, outer_task_id):
         call_sid, recording_uri = call_sid_and_recording_uri
         logger.info(
             f"Transcribe task got call_sid = {call_sid}, recording_uri = {recording_uri}."
@@ -157,7 +157,7 @@ class TranscribeCall(Task):
             logger.info("Got no recording_uri")
 
         else:
-            self.update_state(state=State.transcribing)
+            self.update_state(task_id=outer_task_id, state=State.transcribing)
 
             try:
                 transcript, status = tts.transcribe_audio_at_uri(recording_uri)
@@ -167,14 +167,14 @@ class TranscribeCall(Task):
 
                 if status == TranscriptionStatus.success:
                     text = transcript
-                    self.update_state(state=State.transcribing_done)
+                    self.update_state(task_id=outer_task_id, state=State.transcribing_done)
 
                 else:
-                    self.update_state(state=State.transcribing_failed)
+                    self.update_state(task_id=outer_task_id, state=State.transcribing_failed)
 
             except Exception as err:
                 logger.error(f"Transcription error: {err}")
-                self.update_state(state=State.transcribing_failed)
+                self.update_state(task_id=outer_task_id, state=State.transcribing_failed)
 
         # ideally call DeleteRecordings above, not sure if that's possible
         # with class based tasks so doing it synchronously for now
@@ -190,9 +190,9 @@ class TranscribeCall(Task):
 class ExtractInfo(Task):
     track_started = True
 
-    def run(self, text):
+    def run(self, text, *, outer_task_id):
         logger.info(f"Extract got text = {text}.")
-        self.update_state(state=State.extracting)
+        self.update_state(task_id=outer_task_id, state=State.extracting)
         d = {}
         date = date_info_Google.extract_date_time(text)
         d.update(date)
@@ -201,15 +201,15 @@ class ExtractInfo(Task):
         logger.info(f"Date = {date}")
         logger.info(f"Location = {location}")
         logger.info("Extract done")
-        self.update_state(state=State.extracting_done)
+        self.update_state(task_id=outer_task_id, state=State.extracting_done)
         return d
 
 
 class SendResult(Task):
     track_started = True
 
-    def run(self, data, callback_url):
-        logger.info(f"Send task got callback_url = {callback_url}, data = {data}.")
+    def run(self, data, ain, callback_url, *, outer_task_id):
+        logger.info(f"Send task got ain = {ain}, callback_url = {callback_url}, data = {data}.")
         time.sleep(1)
         logger.info(f"Sending data {data} done.")
         return "data"
