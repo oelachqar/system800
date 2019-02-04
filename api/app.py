@@ -2,6 +2,7 @@ from uuid import uuid4
 
 from api.celery_app import make_celery
 from api.tasks import (
+    CheckCallProgress,
     DeleteRecordings,
     ExtractInfo,
     InitiateCall,
@@ -33,6 +34,7 @@ app.config.update(
 celery = make_celery(app, name="app")
 call = celery.register_task(InitiateCall())
 get_recording_uri = celery.register_task(PullRecording())
+check_call_progress = celery.register_task(CheckCallProgress())
 extract_info = celery.register_task(ExtractInfo())
 transcribe = celery.register_task(TranscribeCall())
 send_result = celery.register_task(SendResult())
@@ -87,9 +89,9 @@ def process():
 
     """
     Workflow:
-    schedule_call* -- check_call_done* -- transcribe* -- extract* -- send
-                                               |                      |
-                                          delete_recording  -------  dummy
+    schedule_call* -- check_call_done* -- fetch_recording -- transcribe* -- extract* -- send
+                                                                  |                      |
+                                                             delete_recording  -------  dummy
 
     *: after failure, we invoke send_error to inform caller of error
     """
@@ -102,9 +104,12 @@ def process():
         call.s(ain, outer_task_id=task_id).set(
             link_error=send_error.s(ain, callback_url)
         ),
-        get_recording_uri.s(outer_task_id=task_id).set(
-            countdown=60,  # delay getting the recording as the call takes time
+        check_call_progress.s(outer_task_id=task_id).set(
+            countdown=60,  # delay the initial check as the call takes time
             link_error=send_error.s(ain, callback_url),
+        ),
+        get_recording_uri.s(outer_task_id=task_id).set(
+            link_error=send_error.s(ain, callback_url)
         ),
         transcribe.s(outer_task_id=task_id).set(
             link_error=send_error.s(ain, callback_url)
@@ -121,28 +126,20 @@ def process():
         dummy_task.si(ain, callback_url, outer_task_id=task_id),
     ).apply_async(task_id=task_id)
 
-    return jsonify(
-        {
-            "ain": ain,
-            "task_id": result.task_id,
-            "state": result.state,
-        }
-    )
+    return jsonify({"ain": ain, "task_id": result.task_id, "state": result.state})
 
 
 @app.route("/status/<task_id>")
 def status(task_id):
     result = AsyncResult(task_id)
 
-    return jsonify(
-        {"task_id": result.task_id, "state": result.state}
-    )
+    return jsonify({"task_id": result.task_id, "state": result.state})
 
 
-@app.route("/debug_callback", methods=['POST'])
+@app.route("/debug_callback", methods=["POST"])
 def debug_callback():
     if not request.is_json:
-        return '', 400
+        return "", 400
 
     print(request.get_json())
-    return '', 200
+    return "", 200

@@ -55,7 +55,7 @@ class InitiateCall(Task):
         return call_sid
 
 
-class PullRecording(Task):
+class CheckCallProgress(Task):
     """ Retrieves the recording uri from a call sid once the call has completed.
     """
 
@@ -81,13 +81,6 @@ class PullRecording(Task):
         status = twilio.fetch_status(call_sid)
         logger.info(f'Status of call {call_sid} is "{status}"')
 
-        recording_uri = ""
-
-        if status in self.failed_call_states:
-            self.update_state(task_id=outer_task_id, state=State.error)
-
-            return call_sid, recording_uri
-
         if status in self.in_progress_call_states:
             try:
                 logger.info("Will retry")
@@ -96,20 +89,31 @@ class PullRecording(Task):
             except MaxRetriesExceededError:
                 logger.info(f"Exceeded max retries, giving up")
                 self.update_state(task_id=outer_task_id, state=State.error)
+                return call_sid
 
-                return call_sid, recording_uri
+        if status in self.failed_call_states:
+            self.update_state(task_id=outer_task_id, state=State.error)
+            logger.error(f'Error call status: "{status}"')
+            return call_sid
 
-        # the only other status we expect is completed
-        if status != TwilioCallStatus.COMPLETED:
+        elif status == TwilioCallStatus.COMPLETED:
+            self.update_state(task_id=outer_task_id, state=State.error)
+            return call_sid
+
+        else:
             # treat unexpected status as an error
             logger.error(f'Unexpected call status: "{status}"')
-
             self.update_state(task_id=outer_task_id, state=State.error)
+            return call_sid
 
-            return call_sid, recording_uri
 
+class PullRecording(Task):
+    track_started = True
+
+    def run(self, call_sid, *, outer_task_id):
         # call has completed, find the recording uri
         recordings = twilio.fetch_recordings(call_sid)
+        recording_uri = ""
         if not recordings:
             logger.error(f"Call {call_sid} completed with no recording")
 
