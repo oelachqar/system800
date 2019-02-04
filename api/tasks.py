@@ -119,7 +119,7 @@ class PullRecording(Task):
 
             self.update_state(task_id=outer_task_id, state=State.error)
 
-            return call_sid, recording_uri
+            return {"call_sid": call_sid, "recording_uri": recording_uri}
 
         else:
             recording_uri = twilio.get_full_recording_uri(recordings[0])
@@ -127,15 +127,15 @@ class PullRecording(Task):
 
             self.update_state(task_id=outer_task_id, state=State.recording_ready)
 
-            return call_sid, recording_uri
+            return {"call_sid": call_sid, "recording_uri": recording_uri}
 
 
 class DeleteRecordings(Task):
     """ Deletes all recordings associated to a given call sid.
     """
 
-    def run(self, call_sid_and_text):
-        call_sid, _ = call_sid_and_text
+    def run(self, request):
+        call_sid = request.get("call_sid")
         logger.info(f"Delete recordings task got call_sid = {call_sid}.")
 
         call = twilio.fetch_call(call_sid)
@@ -155,8 +155,10 @@ class TranscribeCall(Task):
 
     track_started = True
 
-    def run(self, call_sid_and_recording_uri, *, outer_task_id):
-        call_sid, recording_uri = call_sid_and_recording_uri
+    def run(self, request, *, outer_task_id):
+        call_sid = request.get("call_sid")
+        recording_uri = request.get("recording_uri")
+
         logger.info(
             f"Transcribe task got call_sid = {call_sid}, "
             f"recording_uri = {recording_uri}."
@@ -193,14 +195,14 @@ class TranscribeCall(Task):
                     task_id=outer_task_id, state=State.transcribing_failed
                 )
 
-        return call_sid, text
+        return {"call_sid": call_sid, "text": text}
 
 
 class ExtractInfo(Task):
     track_started = True
 
-    def run(self, call_sid_and_text, *, outer_task_id):
-        _, text = call_sid_and_text
+    def run(self, request, *, outer_task_id):
+        text = request.get("text")
         logger.info(f"Extract got text = {text}.")
         self.update_state(task_id=outer_task_id, state=State.extracting)
         d = {}
@@ -211,9 +213,7 @@ class ExtractInfo(Task):
         location = location_info.extract_location(text)
         if location is not None:
             d.update(location)
-        logger.info(f"Date = {date}")
-        logger.info(f"Location = {location}")
-        logger.info("Extract done")
+        logger.info(f"Date = {date}. Location = {location}")
         self.update_state(task_id=outer_task_id, state=State.extracting_done)
         return d
 
