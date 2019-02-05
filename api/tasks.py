@@ -183,7 +183,7 @@ class TranscribeCall(Task):
 
         except TTSExceptions.RequestError as exc:
             # we retry on request errors
-            raise self.retry(exc=exc)
+            raise self.retry(exc=exc, countdown=10)
 
         except Exception as exc:
             # for other errors (unintelligible audio etc) we don't retry
