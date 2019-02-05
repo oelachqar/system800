@@ -153,6 +153,9 @@ class TranscribeCall(Task):
     # need to make an async call to the tts service (and not use speech rec
     # package).
 
+    # TODO
+    # Looks like retry_backoff and retry_jitter are not respected by self.retry()
+    # https://stackoverflow.com/questions/9731435/retry-celery-tasks-with-exponential-back-off#comment90534054_46467851
     track_started = True
     retry_backoff = 4
     retry_jitter = True
