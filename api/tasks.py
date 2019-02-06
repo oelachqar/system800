@@ -13,7 +13,7 @@ from twilio.rest.api.v2010.account.call import CallInstance
 from workflow.call.twilio_call_wrapper import TwilioCallWrapper
 from workflow.extract import date_info, location_info
 from workflow.transcribe.google_tts import GoogleTranscriber
-from workflow.transcribe.tts_status import TranscriptionStatus
+from workflow.transcribe import exceptions as TTSExceptions
 
 
 logger = get_task_logger("app")
@@ -153,7 +153,13 @@ class TranscribeCall(Task):
     # need to make an async call to the tts service (and not use speech rec
     # package).
 
+    # TODO
+    # Looks like retry_backoff and retry_jitter are not respected by self.retry()
+    # https://stackoverflow.com/questions/9731435/retry-celery-tasks-with-exponential-back-off#comment90534054_46467851
     track_started = True
+    retry_backoff = 4
+    retry_jitter = True
+    max_retries = 5
 
     def run(self, request, *, outer_task_id):
         call_sid = request.get("call_sid")
@@ -164,38 +170,28 @@ class TranscribeCall(Task):
             f"recording_uri = {recording_uri}."
         )
 
-        text = ""
+        self.update_state(task_id=outer_task_id, state=State.transcribing)
 
-        if recording_uri == "":
-            logger.info("Got no recording_uri")
+        try:
+            text = tts.transcribe_audio_at_uri(recording_uri)
 
-        else:
-            self.update_state(task_id=outer_task_id, state=State.transcribing)
+            logger.info(f"Transcript = {text}")
 
-            try:
-                transcript, status = tts.transcribe_audio_at_uri(recording_uri)
+            self.update_state(task_id=outer_task_id, state=State.transcribing_done)
 
-                logger.info(f"Transcribe status = {status}")
-                logger.info(f"Transcript = {transcript}")
+            return {"call_sid": call_sid, "text": text}
 
-                if status == TranscriptionStatus.success:
-                    text = transcript
-                    self.update_state(
-                        task_id=outer_task_id, state=State.transcribing_done
-                    )
+        except TTSExceptions.RequestError as exc:
+            # we retry on request errors
+            raise self.retry(exc=exc, countdown=10)
 
-                else:
-                    self.update_state(
-                        task_id=outer_task_id, state=State.transcribing_failed
-                    )
+        except Exception as exc:
+            # for other errors (unintelligible audio etc) we don't retry
+            logger.error(f"Transcription error: {exc}")
 
-            except Exception as err:
-                logger.error(f"Transcription error: {err}")
-                self.update_state(
-                    task_id=outer_task_id, state=State.transcribing_failed
-                )
+            self.update_state(task_id=outer_task_id, state=State.transcribing_failed)
 
-        return {"call_sid": call_sid, "text": text}
+            raise
 
 
 class ExtractInfo(Task):

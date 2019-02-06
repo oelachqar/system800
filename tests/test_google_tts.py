@@ -3,6 +3,7 @@ import unittest
 from config import TestConfig
 from workflow.transcribe.google_tts import GoogleTranscriber
 
+
 @unittest.skip
 class TestGoogleTranscriber(unittest.TestCase):
     def setUp(self):
@@ -14,7 +15,7 @@ class TestGoogleTranscriber(unittest.TestCase):
 
     def test_transcribe(self):
         transcript = self.google_transcriber.transcribe_audio_file_path(self.audio_path)
-        self.assertEqual(transcript[0].strip(), self.expected_text)
+        self.assertEqual(transcript.strip(), self.expected_text)
 
 
 if __name__ == "__main__":

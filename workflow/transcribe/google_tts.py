@@ -1,9 +1,9 @@
 import io
 import requests
-import sys
+
 import speech_recognition as sr
 
-from .tts_status import TranscriptionStatus
+from workflow.transcribe import exceptions
 
 
 class GoogleTranscriber(object):
@@ -18,10 +18,9 @@ class GoogleTranscriber(object):
         audio_file_path: may be a filename or a file object
         https://github.com/Uberi/speech_recognition/blob/master/reference/library-reference.rst#audiofilefilename_or_fileobject-unionstr-ioiobase---audiofile
         """
-        r = sr.Recognizer()
-        transcript = ""
-        transcription_status = TranscriptionStatus.success
+
         with sr.AudioFile(audio_file_path) as source:
+            r = sr.Recognizer()
             audio_object = r.record(source)
             try:
                 # hitting this error with SpeechRecognition module if preferred
@@ -35,23 +34,25 @@ class GoogleTranscriber(object):
                     preferred_phrases=None,
                     show_all=False,
                 )
-            except sr.UnknownValueError as e:
-                transcription_status = TranscriptionStatus.transcription_error
-                print("Google Cloud Speech could not understand audio: {0}".format(e))
-            except sr.RequestError as e:
-                transcription_status = TranscriptionStatus.request_error
-                print(
-                    "Could not request results from Google Cloud Speech " "service; {0}".format(e)
-                )
-            except Exception:
-                print("Unknown transcription error:", sys.exc_info())
-                transcription_status = TranscriptionStatus.unknown_error
-        return transcript, transcription_status
 
-    # TODO
-    # deal with exceptions
+                return transcript
+
+            except sr.UnknownValueError as exc:
+                raise exceptions.BadAudio("TTS audio unintelligible") from exc
+
+            except sr.RequestError as exc:
+                raise exceptions.RequestError("TTS request failed") from exc
+
     def transcribe_audio_at_uri(self, audio_uri):
-        response = requests.get(audio_uri)
+        try:
+            response = requests.get(audio_uri)
+            response.raise_for_status()
+
+        # http://docs.python-requests.org/en/latest/user/quickstart/#errors-and-exceptions
+        except requests.exceptions.RequestException as exc:
+            raise exceptions.RequestError(
+                f"Error retrieving audio from uri: {audio_uri}"
+            ) from exc
 
         audio = io.BytesIO(response.content)
 
