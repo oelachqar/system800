@@ -202,17 +202,18 @@ class ExtractInfo(Task):
     track_started = True
 
     def run(self, request, *, outer_task_id):
+        """ 
+        returns dictionary with transcription text and keys relating to extracted date and location info
+        all key values (except transcription text) are None if extraction fails
+        """
         text = request.get("text")
         logger.info(f"Extract got text = {text}.")
         self.update_state(task_id=outer_task_id, state=State.extracting)
-        d = {}
-        # TODO: raise error if extraction fails ?
+        d = {"trancription":text}
         date = date_info.extract_date_time(text)
-        if date is not None:
-            d.update(date)
+        d.update(date)
         location = location_info.extract_location(text)
-        if location is not None:
-            d.update(location)
+        d.update(location)
         logger.info(f"Date = {date}. Location = {location}")
         self.update_state(task_id=outer_task_id, state=State.extracting_done)
         return d
