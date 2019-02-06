@@ -38,8 +38,10 @@ def extract_location(s):
                 'City': None,
                 'Zipcode': possible_locations[0][1],
                 'Confidence_location': "low"}
-        print(d)
         return d
     else:
-        return None
+        return {'State': None,
+                'City': None,
+                'Zipcode': None,
+                'Confidence_location': None}
 
