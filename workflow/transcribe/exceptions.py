@@ -4,4 +4,3 @@ class RequestError(Exception):
 
 class BadAudio(Exception):
     pass
-

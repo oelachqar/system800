@@ -1,0 +1,7 @@
+<!--We're currently using this twiml template in our call-->
+<Response>
+<Pause length="{pauseBeforeSendingDigitsLength}"/>
+<Play digits="{digits}"/>
+<Pause length="{pauseAfterSendingDigitsLength}"/>
+<Hangup/>
+</Response>
