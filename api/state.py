@@ -12,4 +12,5 @@ class State(object):
     extracting = "extracting_info"
     extracting_done = "extracting_done"
     error = "error"
+    user_error = "user_error"
     failed_to_return_info = "failed_to_return_info"

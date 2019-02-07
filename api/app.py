@@ -20,6 +20,7 @@ from config import Config
 from flask import Flask, jsonify, request
 
 import requests
+from api.state import State
 
 
 #
@@ -81,7 +82,21 @@ def dummy_task(ain, callback_url, outer_task_id):
 @app.route("/process", methods=["POST", "GET"])
 def process():
     ain = request.args.get("ain")
+    
+    #AINs are 8 or 9 digit numbers.  If an 8 digit number is provided, a 0 must be pre-pended
+    if len(ain)==8:
+        ain = "0" + ain
+
+    #immediately fail if ain is not of the right length
+    if (len(ain) != 9):
+        return jsonify({ "state": State.user_error , "error_message": "ain is wrong length" }), 400
+
+
+    
     callback_url = request.args.get("callback_url")
+    #TODO -- check callback url is here
+
+    
 
     # we create a task id for the outer task so that inner tasks can update its
     # state
