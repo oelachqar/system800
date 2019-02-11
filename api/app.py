@@ -150,7 +150,7 @@ def process():
                     "error_message": "The current user is not authorized to make this request",
                 }
             ),
-            401,
+            403,
         )
 
     ain = request.args.get("ain")
