@@ -13,4 +13,5 @@ class State(object):
     extracting_done = "extracting_done"
     error = "error"
     user_error = "user_error"
+    user_not_authorized = "user_not_authorized"
     failed_to_return_info = "failed_to_return_info"
