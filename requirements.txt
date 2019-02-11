@@ -6,6 +6,8 @@ celery
 flower
 redis
 flask
+flask-httpauth
+pyjwt
 SpeechRecognition
 google-api-python-client
 oauth2client

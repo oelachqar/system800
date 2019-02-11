@@ -1,6 +1,15 @@
+import requests
+import time
 from uuid import uuid4
 
+from celery import chain, group
+from celery.result import AsyncResult
+from flask import Flask, g, jsonify, request
+from flask_httpauth import HTTPBasicAuth, HTTPTokenAuth
+import jwt
+
 from api.celery_app import make_celery
+from api.state import State
 from api.tasks import (
     CheckCallProgress,
     DeleteRecordings,
@@ -11,16 +20,7 @@ from api.tasks import (
     TranscribeCall,
     logger,
 )
-
-from celery import chain, group
-from celery.result import AsyncResult
-
 from config import Config
-
-from flask import Flask, jsonify, request
-
-import requests
-from api.state import State
 
 
 #
@@ -32,7 +32,14 @@ app.config.update(
     CELERY_RESULT_BACKEND=Config.celery_result_backend,
 )
 
+basic_auth = HTTPBasicAuth()
+token_auth = HTTPTokenAuth()
+
 celery = make_celery(app, name="app")
+
+#
+# Celery tasks
+#
 call = celery.register_task(InitiateCall())
 get_recording_uri = celery.register_task(PullRecording())
 check_call_progress = celery.register_task(CheckCallProgress())
@@ -77,32 +84,114 @@ def dummy_task(ain, callback_url, outer_task_id):
 
 
 #
+# Authentication
+#
+@basic_auth.verify_password
+def verify_password(username, password):
+    # TODO implement a proper check
+    g.curent_user = {"user_id": 123, "has_access": True}
+    return True
+
+
+@basic_auth.error_handler
+def basic_auth_error():
+    # TODO implement
+    response = jsonify({})
+    response.status_code = 401
+    return response
+
+
+@token_auth.verify_token
+def verify_token(token):
+    payload = jwt.decode(token, Config.token_secret_key, algorithms=["HS256"])
+    g.current_user = {
+        "user_id": payload["user_id"],
+        "has_access": payload["has_access"],
+    }
+    return True
+
+
+@token_auth.error_handler
+def token_auth_error():
+    # TODO implement
+    response = jsonify({})
+    response.status_code = 401
+    return response
+
+
+#
 # Flask Routes
 #
+@app.route("/tokens", methods=["POST"])
+@basic_auth.login_required
+def get_token():
+    user = g.curent_user
+    token = jwt.encode(
+        {
+            "user_id": user["user_id"],
+            "has_access": user["has_access"],
+            "exp": time.time() + Config.token_expiration_seconds,
+        },
+        Config.token_secret_key,
+        algorithm="HS256",
+    ).decode("utf-8")
+    return jsonify({"token": token})
+
+
 @app.route("/process", methods=["POST", "GET"])
+@token_auth.login_required
 def process():
+    # check that the current user has enough privileges
+    if not g.current_user["has_access"]:
+        return (
+            jsonify(
+                {
+                    "state": State.user_not_authorized,
+                    "error_message": "The current user is not authorized to make this request",
+                }
+            ),
+            403,
+        )
+
     ain = request.args.get("ain")
-    
-    #AINs are 8 or 9 digit numbers.  If an 8 digit number is provided, a 0 must be pre-pended
-    if len(ain)==8:
+
+    # AINs are 8 or 9 digit numbers.
+    # If an 8 digit number is provided, a 0 must be pre-pended
+    if len(ain) == 8:
         ain = "0" + ain
 
-    #immediately fail if ain is not of the right length
-    if (len(ain) != 9):
-        return jsonify({ "state": State.user_error , "error_message": "ain is wrong length" }), 400
+    # immediately fail if ain is not of the right length
+    if len(ain) != 9:
+        return (
+            jsonify(
+                {"state": State.user_error, "error_message": "ain is wrong length"}
+            ),
+            400,
+        )
 
     callback_url = request.args.get("callback_url")
-    #check callback url is here
+
+    # check callback url is here
     try:
         response = requests.get(callback_url)
     except Exception as exc:
-        return jsonify({"state": State.user_error, "error_message":"invalid callback url ", 
-        "error":exc.__class__.__name__}), 400
-    if response.status_code>=400:
-        return jsonify({"state": State.user_error, "error_message":"invalid callback url "}), 400
-
-
-    
+        return (
+            jsonify(
+                {
+                    "state": State.user_error,
+                    "error_message": "invalid callback url ",
+                    "error": exc.__class__.__name__,
+                }
+            ),
+            400,
+        )
+    if response.status_code >= 400:
+        return (
+            jsonify(
+                {"state": State.user_error, "error_message": "invalid callback url "}
+            ),
+            400,
+        )
 
     # we create a task id for the outer task so that inner tasks can update its
     # state
@@ -151,6 +240,7 @@ def process():
 
 
 @app.route("/status/<task_id>")
+@token_auth.login_required
 def status(task_id):
     result = AsyncResult(task_id)
 

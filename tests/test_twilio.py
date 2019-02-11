@@ -36,8 +36,12 @@ def main(case_number, recording_file):
     )
 
     print(f"Making call for case number: {case_number}")
-    print(f"Call will take {twilio.call_initial_pause_secs} seconds before digits are entered")
-    print(f"Call will take {twilio.call_final_pause_secs} seconds after digits are entered")
+    print(
+        f"Call will take {twilio.call_initial_pause_secs} seconds before digits are entered"
+    )
+    print(
+        f"Call will take {twilio.call_final_pause_secs} seconds after digits are entered"
+    )
 
     call_sid = twilio.place_and_record_call(case_number)
 
