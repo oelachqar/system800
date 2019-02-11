@@ -91,10 +91,16 @@ def process():
     if (len(ain) != 9):
         return jsonify({ "state": State.user_error , "error_message": "ain is wrong length" }), 400
 
-
-    
     callback_url = request.args.get("callback_url")
-    #TODO -- check callback url is here
+    #check callback url is here
+    try:
+        response = requests.get(callback_url)
+    except Exception as exc:
+        return jsonify({"state": State.user_error, "error_message":"invalid callback url ", 
+        "error":exc.__class__.__name__}), 400
+    if response.status_code>=400:
+        return jsonify({"state": State.user_error, "error_message":"invalid callback url "}), 400
+
 
     
 
@@ -151,10 +157,13 @@ def status(task_id):
     return jsonify({"task_id": result.task_id, "state": result.state})
 
 
-@app.route("/debug_callback", methods=["POST"])
+@app.route("/debug_callback", methods=["POST", "GET"])
 def debug_callback():
-    if not request.is_json:
-        return "", 400
+    if request.method == "POST":
+        if not request.is_json:
+            return "", 400
 
-    print(request.get_json())
-    return "", 200
+        print(request.get_json())
+        return "", 200
+    elif request.method == "GET":
+        return "", 200
