@@ -1,15 +1,12 @@
-from api.state import State
+import requests
 
 from celery import Task
 from celery.exceptions import MaxRetriesExceededError
 from celery.utils.log import get_task_logger
-
-from config import Config
-
-import requests
-
 from twilio.rest.api.v2010.account.call import CallInstance
 
+from api.state import State
+from config import Config
 from workflow.call.twilio_call_wrapper import TwilioCallWrapper
 from workflow.extract import date_info, location_info
 from workflow.transcribe import exceptions

@@ -1,4 +1,12 @@
+import requests
+import time
 from uuid import uuid4
+
+from celery import chain, group
+from celery.result import AsyncResult
+from flask import Flask, g, jsonify, request
+from flask_httpauth import HTTPBasicAuth, HTTPTokenAuth
+import jwt
 
 from api.celery_app import make_celery
 from api.state import State
@@ -12,21 +20,8 @@ from api.tasks import (
     TranscribeCall,
     logger,
 )
-
-from celery import chain, group
-from celery.result import AsyncResult
-
 from config import Config
 
-from flask import Flask, g, jsonify, request
-from flask_httpauth import HTTPBasicAuth, HTTPTokenAuth
-
-import jwt
-
-import requests
-import time
-
-from api.state import State
 
 #
 # Init apps
