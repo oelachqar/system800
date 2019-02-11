@@ -19,7 +19,7 @@ class Config(object):
     token_secret_key = os.getenv("TOKEN_SECRET_KEY")
     token_expiration_seconds = int(os.getenv("TOKEN_EXPIRATION_SECONDS", 300))
 
-    # tts config
+    # speech to text config
     google_credentials_json = os.getenv("GOOGLE_CREDENTIALS_JSON")
 
     # celery config
@@ -32,5 +32,5 @@ class TestConfig(Config):
     test_call_case_number = os.getenv("TEST_CALL_CASE_NUMBER")
     test_call_recording_file = os.getenv("TEST_CALL_RECORDING_FILE")
 
-    # tts testing
+    # speech to text testing
     test_google_audio_path = os.getenv("TEST_GOOGLE_AUDIO_PATH")

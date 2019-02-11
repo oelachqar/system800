@@ -1,4 +1,5 @@
 import io
+
 import requests
 
 import speech_recognition as sr
@@ -38,10 +39,12 @@ class GoogleTranscriber(object):
                 return transcript
 
             except sr.UnknownValueError as exc:
-                raise exceptions.BadAudio("TTS audio unintelligible") from exc
+                raise exceptions.BadAudio(
+                    "Speech to text audio unintelligible"
+                ) from exc
 
             except sr.RequestError as exc:
-                raise exceptions.RequestError("TTS request failed") from exc
+                raise exceptions.RequestError("Speech to text request failed") from exc
 
     def transcribe_audio_at_uri(self, audio_uri):
         try:

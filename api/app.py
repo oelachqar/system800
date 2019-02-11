@@ -1,6 +1,7 @@
 from uuid import uuid4
 
 from api.celery_app import make_celery
+from api.state import State
 from api.tasks import (
     CheckCallProgress,
     DeleteRecordings,
@@ -159,7 +160,8 @@ def process():
 
     ain = request.args.get("ain")
 
-    # AINs are 8 or 9 digit numbers.  If an 8 digit number is provided, a 0 must be pre-pended
+    # AINs are 8 or 9 digit numbers.
+    # If an 8 digit number is provided, a 0 must be pre-pended
     if len(ain) == 8:
         ain = "0" + ain
 
