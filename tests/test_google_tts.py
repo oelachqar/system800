@@ -1,7 +1,7 @@
 import unittest
 
 from config import TestConfig
-from workflow.transcribe.google_tts import GoogleTranscriber
+from workflow.transcribe.google_transcribe import GoogleTranscriber
 
 
 @unittest.skip

@@ -13,7 +13,7 @@ from twilio.rest.api.v2010.account.call import CallInstance
 from workflow.call.twilio_call_wrapper import TwilioCallWrapper
 from workflow.extract import date_info, location_info
 from workflow.transcribe import exceptions
-from workflow.transcribe.google_tts import GoogleTranscriber
+from workflow.transcribe.google_transcribe import GoogleTranscriber
 
 
 logger = get_task_logger("app")
@@ -29,7 +29,7 @@ twilio = TwilioCallWrapper(
 
 TwilioCallStatus = CallInstance.Status
 
-tts = GoogleTranscriber(
+transcriber = GoogleTranscriber(
     Config.google_credentials_json, None
 )  # preferred phrases None for now
 
@@ -150,8 +150,8 @@ class TranscribeCall(Task):
 
     # TODO
     # Ensure we only send < 1 min of audio to be transcribed -- otherwise we
-    # need to make an async call to the tts service (and not use speech rec
-    # package).
+    # need to make an async call to the speech to text service
+    # (and not use speech rec package).
 
     # TODO
     # Looks like retry_backoff and retry_jitter are not respected by self.retry()
@@ -173,7 +173,7 @@ class TranscribeCall(Task):
         self.update_state(task_id=outer_task_id, state=State.transcribing)
 
         try:
-            text = tts.transcribe_audio_at_uri(recording_uri)
+            text = transcriber.transcribe_audio_at_uri(recording_uri)
 
             logger.info(f"Transcript = {text}")
 

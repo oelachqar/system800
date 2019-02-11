@@ -12,10 +12,10 @@ class Config(object):
     call_twilio_auth_token = os.getenv("CALL_TWILIO_AUTH_TOKEN")
     call_twilio_local_number = os.getenv("CALL_TWILIO_LOCAL_NUMBER")
     call_number_to_call = os.getenv("CALL_NUMBER_TO_CALL")
-    call_final_pause_secs = os.getenv("CALL_FINAL_PAUSE") or 45 
-    call_initial_pause_secs = os.getenv("CALL_INITIAL_PAUSE") 
+    call_final_pause_secs = os.getenv("CALL_FINAL_PAUSE") or 45
+    call_initial_pause_secs = os.getenv("CALL_INITIAL_PAUSE")
 
-    # tts config
+    # speech to text config
     google_credentials_json = os.getenv("GOOGLE_CREDENTIALS_JSON")
 
     # celery config
@@ -28,5 +28,5 @@ class TestConfig(Config):
     test_call_case_number = os.getenv("TEST_CALL_CASE_NUMBER")
     test_call_recording_file = os.getenv("TEST_CALL_RECORDING_FILE")
 
-    # tts testing
+    # speech to text testing
     test_google_audio_path = os.getenv("TEST_GOOGLE_AUDIO_PATH")
