@@ -12,8 +12,8 @@ from twilio.rest.api.v2010.account.call import CallInstance
 
 from workflow.call.twilio_call_wrapper import TwilioCallWrapper
 from workflow.extract import date_info, location_info
+from workflow.transcribe import exceptions
 from workflow.transcribe.google_tts import GoogleTranscriber
-from workflow.transcribe import exceptions as TTSExceptions
 
 
 logger = get_task_logger("app")
@@ -181,7 +181,7 @@ class TranscribeCall(Task):
 
             return {"call_sid": call_sid, "text": text}
 
-        except TTSExceptions.RequestError as exc:
+        except exceptions.RequestError as exc:
             # we retry on request errors
             raise self.retry(exc=exc, countdown=10)
 
@@ -198,14 +198,15 @@ class ExtractInfo(Task):
     track_started = True
 
     def run(self, request, *, outer_task_id):
-        """ 
-        returns dictionary with transcription text and keys relating to extracted date and location info
+        """
+        returns dictionary with transcription text and keys relating to extracted date
+        and location info.
         all key values (except transcription text) are None if extraction fails
         """
         text = request.get("text")
         logger.info(f"Extract got text = {text}.")
         self.update_state(task_id=outer_task_id, state=State.extracting)
-        d = {"trancription":text}
+        d = {"trancription": text}
         date = date_info.extract_date_time(text)
         d.update(date)
         location = location_info.extract_location(text)
