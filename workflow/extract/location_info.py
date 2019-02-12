@@ -53,4 +53,3 @@ def extract_location(s):
             "Zipcode": None,
             "Confidence_location": None,
         }
-

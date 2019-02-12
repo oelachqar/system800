@@ -98,9 +98,8 @@ def extract_date_time_base(s, words_to_nums=False):
     {'year': 2021, 'month': 3, 'day': 2, 'hour': 16, 'minute': 30}
     even though 'day' should be None.
 
-    We get around this problem by adding two different defaults and checking if the dict returned are the same.
-
-
+    We get around this problem by adding two different defaults and checking if the
+    dict returned are the same.
     """
     possible_dates = find_possible_date_times(s, words_to_nums)
     default_1 = datetime(1900, 1, 1, 0, 0)

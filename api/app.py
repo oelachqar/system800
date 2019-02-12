@@ -143,13 +143,9 @@ def get_token():
 def process():
     # check that the current user has enough privileges
     if not g.current_user["has_access"]:
+        msg = "The current user is not authorized to make this request"
         return (
-            jsonify(
-                {
-                    "state": State.user_not_authorized,
-                    "error_message": "The current user is not authorized to make this request",
-                }
-            ),
+            jsonify({"state": State.user_not_authorized, "error_message": msg}),
             403,
         )
 
@@ -199,9 +195,9 @@ def process():
 
     """
     Workflow:
-    schedule_call* -- check_call_done* -- fetch_recording -- transcribe* -- extract* -- send
-                                                                  |                      |
-                                                             delete_recording  -------  dummy
+    place_call* - check_call_done* - get_recording* - transcribe* - extract* - send
+                                                         |                      |
+                                                      delete_recording -----  dummy
 
     *: after failure, we invoke send_error to inform caller of error
     """
