@@ -7,6 +7,7 @@ from celery.result import AsyncResult
 from flask import Flask, g, jsonify, request
 from flask_httpauth import HTTPBasicAuth, HTTPTokenAuth
 import jwt
+from werkzeug.http import HTTP_STATUS_CODES
 
 from api.celery_app import make_celery
 from api.state import State
@@ -95,15 +96,28 @@ def verify_password(username, password):
 
 @basic_auth.error_handler
 def basic_auth_error():
-    # TODO implement
-    response = jsonify({})
-    response.status_code = 401
+    status_code = 401
+    response = jsonify({"error": HTTP_STATUS_CODES[status_code]})
+    response.status_code = status_code
     return response
 
 
 @token_auth.verify_token
 def verify_token(token):
-    payload = jwt.decode(token, Config.token_secret_key, algorithms=["HS256"])
+    if not token:
+        g.error_message = "Token required"
+        return False
+
+    try:
+        payload = jwt.decode(token, Config.token_secret_key, algorithms=["HS256"])
+    except jwt.ExpiredSignatureError:
+        g.error_message = "Token expired"
+        return False
+    except Exception as e:
+        print(e)
+        g.error_message = "Invalid token"
+        return False
+
     g.current_user = {
         "user_id": payload["user_id"],
         "has_access": payload["has_access"],
@@ -113,9 +127,12 @@ def verify_token(token):
 
 @token_auth.error_handler
 def token_auth_error():
-    # TODO implement
-    response = jsonify({})
-    response.status_code = 401
+    status_code = 401
+    error_message = g.error_message
+    response = jsonify(
+        {"error": HTTP_STATUS_CODES[status_code], "error_message": error_message}
+    )
+    response.status_code = status_code
     return response
 
 
@@ -143,10 +160,11 @@ def get_token():
 def process():
     # check that the current user has enough privileges
     if not g.current_user["has_access"]:
-        msg = "The current user is not authorized to make this request"
+        status_code = 403
+        msg = HTTP_STATUS_CODES[status_code]
         return (
             jsonify({"state": State.user_not_authorized, "error_message": msg}),
-            403,
+            status_code,
         )
 
     ain = request.args.get("ain")
