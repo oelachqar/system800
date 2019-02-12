@@ -2,7 +2,7 @@ uszipcode
 python-dateutil
 python-dotenv
 twilio
-celery
+https://github.com/celery/celery/zipball/master#egg=celery
 flower
 redis
 flask
