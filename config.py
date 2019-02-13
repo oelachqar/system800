@@ -29,6 +29,7 @@ class Config(object):
     # celery config
     celery_broker = os.getenv("CELERY_BROKER_URL")
     celery_result_backend = os.getenv("CELERY_RESULT_BACKEND")
+    celery_timezone = "UTC"
 
 
 class TestConfig(Config):

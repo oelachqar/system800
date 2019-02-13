@@ -33,6 +33,7 @@ app = Flask(__name__)
 app.config.update(
     CELERY_BROKER_URL=Config.celery_broker,
     CELERY_RESULT_BACKEND=Config.celery_result_backend,
+    CELERY_TIMEZONE=Config.celery_timezone,
 )
 
 basic_auth = HTTPBasicAuth()
