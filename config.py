@@ -24,7 +24,7 @@ class Config(object):
     # speech to text config
     google_credentials_json = base64.urlsafe_b64decode(
         os.getenv("GOOGLE_CREDENTIALS_JSON").encode("utf8")
-    )
+    ).decode("utf8")
 
     # celery config
     celery_broker = os.getenv("CELERY_BROKER_URL")
