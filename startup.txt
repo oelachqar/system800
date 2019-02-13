@@ -1,1 +1,1 @@
-gunicorn --bind=0.0.0.0 --timeout 600 api.app:app
+gunicorn api.app:app --bind=0.0.0.0 --timeout=600 --log-level=debug --workers=4
