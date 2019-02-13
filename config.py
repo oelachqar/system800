@@ -18,6 +18,7 @@ class Config(object):
     # tokens
     token_secret_key = os.getenv("TOKEN_SECRET_KEY")
     token_expiration_seconds = int(os.getenv("TOKEN_EXPIRATION_SECONDS", 300))
+    token_sign_algorithm = os.getenv("TOKEN_SIGN_ALGORITHM", "HS256")
 
     # speech to text config
     google_credentials_json = os.getenv("GOOGLE_CREDENTIALS_JSON")

@@ -95,15 +95,24 @@ def verify_password(username, password):
 
 @basic_auth.error_handler
 def basic_auth_error():
-    # TODO implement
-    response = jsonify({})
+    msg = "Wrong username / password."
+    response = jsonify({"state": State.user_not_authorized, "error_message": msg})
     response.status_code = 401
     return response
 
 
 @token_auth.verify_token
 def verify_token(token):
-    payload = jwt.decode(token, Config.token_secret_key, algorithms=["HS256"])
+    if not token:
+        return False
+
+    try:
+        payload = jwt.decode(
+            token, Config.token_secret_key, algorithms=[Config.token_sign_algorithm]
+        )
+    except jwt.DecodeError:
+        return False
+
     g.current_user = {
         "user_id": payload["user_id"],
         "has_access": payload["has_access"],
@@ -113,8 +122,8 @@ def verify_token(token):
 
 @token_auth.error_handler
 def token_auth_error():
-    # TODO implement
-    response = jsonify({})
+    msg = "The current user is not authenticated."
+    response = jsonify({"state": State.user_not_authorized, "error_message": msg})
     response.status_code = 401
     return response
 
@@ -133,7 +142,7 @@ def get_token():
             "exp": time.time() + Config.token_expiration_seconds,
         },
         Config.token_secret_key,
-        algorithm="HS256",
+        algorithm=Config.token_sign_algorithm,
     ).decode("utf-8")
     return jsonify({"token": token})
 
@@ -144,10 +153,9 @@ def process():
     # check that the current user has enough privileges
     if not g.current_user["has_access"]:
         msg = "The current user is not authorized to make this request"
-        return (
-            jsonify({"state": State.user_not_authorized, "error_message": msg}),
-            403,
-        )
+        response = jsonify({"state": State.user_not_authorized, "error_message": msg})
+        response.status_code = 401
+        return response
 
     ain = request.args.get("ain")
 
@@ -158,12 +166,10 @@ def process():
 
     # immediately fail if ain is not of the right length
     if len(ain) != 9:
-        return (
-            jsonify(
-                {"state": State.user_error, "error_message": "ain is wrong length"}
-            ),
-            400,
-        )
+        msg = "ain is wrong length"
+        response = jsonify({"state": State.user_error, "error_message": msg})
+        response.status_code = 400
+        return response
 
     callback_url = request.args.get("callback_url")
 
