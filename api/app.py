@@ -157,7 +157,7 @@ def process():
         response.status_code = 401
         return response
 
-    ain = request.args.get("ain")
+    ain = request.values.get("ain")
 
     # AINs are 8 or 9 digit numbers.
     # If an 8 digit number is provided, a 0 must be pre-pended
