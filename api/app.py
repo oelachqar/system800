@@ -110,7 +110,7 @@ def verify_token(token):
         payload = jwt.decode(
             token, Config.token_secret_key, algorithms=[Config.token_sign_algorithm]
         )
-    except jwt.DecodeError:
+    except (jwt.DecodeError, jwt.ExpiredSignatureError):
         return False
 
     g.current_user = {
