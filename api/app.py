@@ -8,6 +8,7 @@ from flask import Flask, g, jsonify, request
 from flask_httpauth import HTTPBasicAuth, HTTPTokenAuth
 import jwt
 from werkzeug.http import HTTP_STATUS_CODES
+from urllib.parse import urlparse
 
 from api.celery_app import make_celery
 from api.state import State
@@ -31,6 +32,7 @@ app = Flask(__name__)
 app.config.update(
     CELERY_BROKER_URL=Config.celery_broker,
     CELERY_RESULT_BACKEND=Config.celery_result_backend,
+    CELERY_TIMEZONE=Config.celery_timezone,
 )
 
 basic_auth = HTTPBasicAuth()
@@ -174,27 +176,22 @@ def process():
 
     callback_url = request.values.get("callback_url")
 
-    # check callback url is here
-    try:
-        response = requests.get(callback_url)
-    except Exception as exc:
-        return (
-            jsonify(
-                {
-                    "state": State.user_error,
-                    "error_message": "invalid callback url ",
-                    "error": exc.__class__.__name__,
-                }
-            ),
-            400,
+    # check callback url not null or empty
+    if not callback_url:
+        response = jsonify(
+            {"state": State.user_error, "error_message": "callback url null or empty"}
         )
-    if response.status_code >= 400:
-        return (
-            jsonify(
-                {"state": State.user_error, "error_message": "invalid callback url "}
-            ),
-            400,
+        response.status_code = 400
+        return response
+
+    # check that callback url is a url
+    parsed_url = urlparse(callback_url)
+    if not bool(parsed_url.scheme):
+        response = jsonify(
+            {"state": State.user_error, "error_message": "callback url not valid"}
         )
+        response.status_code = 400
+        return response
 
     # we create a task id for the outer task so that inner tasks can update its
     # state
@@ -250,13 +247,10 @@ def status(task_id):
     return jsonify({"task_id": result.task_id, "state": result.state})
 
 
-@app.route("/debug_callback", methods=["POST", "GET"])
+@app.route("/debug_callback", methods=["POST"])
 def debug_callback():
-    if request.method == "POST":
-        if not request.is_json:
-            return "", 400
+    if not request.is_json:
+        return "", 400
 
-        print(request.get_json())
-        return "", 200
-    elif request.method == "GET":
-        return "", 200
+    print(request.get_json())
+    return "", 200
