@@ -1,3 +1,4 @@
+import base64
 import os
 
 from dotenv import load_dotenv
@@ -21,7 +22,9 @@ class Config(object):
     token_sign_algorithm = os.getenv("TOKEN_SIGN_ALGORITHM", "HS256")
 
     # speech to text config
-    google_credentials_json = os.getenv("GOOGLE_CREDENTIALS_JSON")
+    google_credentials_json = base64.urlsafe_b64decode(
+        os.getenv("GOOGLE_CREDENTIALS_JSON").encode("utf8")
+    )
 
     # celery config
     celery_broker = os.getenv("CELERY_BROKER_URL")
