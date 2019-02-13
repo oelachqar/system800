@@ -116,11 +116,10 @@ def extract_date_time_base(s, words_to_nums=False):
             for key in d:
                 if dt_1.__getattribute__(key) == dt_2.__getattribute__(key):
                     d[key] = dt_1.__getattribute__(key)
-                else:
-                    different = 1
             d["minute"] = dt_1.minute
             return d
-        except:
+        except Exception:
+            # Unable to parse date
             pass
     return d
 
