@@ -7,6 +7,7 @@ from celery.result import AsyncResult
 from flask import Flask, g, jsonify, request
 from flask_httpauth import HTTPBasicAuth, HTTPTokenAuth
 import jwt
+from werkzeug.http import HTTP_STATUS_CODES
 
 from api.celery_app import make_celery
 from api.state import State

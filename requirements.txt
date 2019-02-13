@@ -8,6 +8,7 @@ redis
 flask
 flask-httpauth
 pyjwt
+Werkzeug
 SpeechRecognition
 google-api-python-client
 oauth2client
