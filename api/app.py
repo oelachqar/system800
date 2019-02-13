@@ -172,7 +172,7 @@ def process():
         response.status_code = 400
         return response
 
-    callback_url = request.args.get("callback_url")
+    callback_url = request.values.get("callback_url")
 
     # check callback url is here
     try:
