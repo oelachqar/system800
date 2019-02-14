@@ -1,6 +1,5 @@
 import requests
 import time
-from urllib.parse import urlparse
 from uuid import uuid4
 
 from celery import chain, group
@@ -24,6 +23,8 @@ from api.tasks import (
     logger,
 )
 from config import Config
+
+from api.validate_input import validate_ain, validate_callback_url
 
 
 #
@@ -163,35 +164,21 @@ def process():
 
     ain = request.values.get("ain")
 
+    # checks if ain is numeric and of the right length
+    response = validate_ain(ain)
+    if response != "valid":
+        return response
+
     # AINs are 8 or 9 digit numbers.
     # If an 8 digit number is provided, a 0 must be pre-pended
     if len(ain) == 8:
         ain = "0" + ain
 
-    # immediately fail if ain is not of the right length
-    if len(ain) != 9:
-        msg = "ain is wrong length"
-        response = jsonify({"state": State.user_error, "error_message": msg})
-        response.status_code = 400
-        return response
-
     callback_url = request.values.get("callback_url")
 
-    # check callback url not null or empty
-    if not callback_url:
-        response = jsonify(
-            {"state": State.user_error, "error_message": "callback url null or empty"}
-        )
-        response.status_code = 400
-        return response
-
-    # check that callback url is a url
-    parsed_url = urlparse(callback_url)
-    if not bool(parsed_url.scheme):
-        response = jsonify(
-            {"state": State.user_error, "error_message": "callback url not valid"}
-        )
-        response.status_code = 400
+    # checks that callback_url is a valid url
+    response = validate_callback_url(callback_url)
+    if response != "valid":
         return response
 
     # we create a task id for the outer task so that inner tasks can update its
