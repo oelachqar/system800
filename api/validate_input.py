@@ -11,7 +11,7 @@ def validate_ain(ain):
         return response
 
     if not ain.isdigit():
-        msg = "empty ain"
+        msg = "ain must be a number"
         response = jsonify({"state": State.user_error, "error_message": msg})
         response.status_code = 400
         return response
