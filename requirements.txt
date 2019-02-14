@@ -1,7 +1,7 @@
 uszipcode
 python-dateutil
 python-dotenv
-twilio
+twilio>=6.24.0
 https://github.com/celery/celery/zipball/master#egg=celery
 flower
 redis
