@@ -1,5 +1,5 @@
+import datetime
 import requests
-import time
 from uuid import uuid4
 
 from celery import chain, group
@@ -156,7 +156,8 @@ def get_token():
     token = jwt.encode(
         {
             "has_access": user["has_access"],
-            "exp": time.time() + Config.token_expiration_seconds,
+            "exp": datetime.datetime.utcnow()
+            + datetime.timedelta(seconds=Config.token_expiration_seconds),
         },
         Config.token_secret_key,
         algorithm=Config.token_sign_algorithm,
