@@ -41,15 +41,28 @@ class InitiateCall(Task):
     track_started = True
 
     def run(self, ain, *, outer_task_id):
-        logger.info(f"Call task got ain = {ain}")
 
-        self.update_state(task_id=outer_task_id, state=State.calling)
+        try:
+            logger.info(f"Call task got ain = {ain}")
 
-        call_sid = twilio.place_and_record_call(ain)
+            self.update_state(task_id=outer_task_id, state=State.calling)
 
-        logger.info(f"Call scheduled, call_sid = {call_sid}")
+            raise ValueError("aggghh")
 
-        return call_sid
+            call_sid = twilio.place_and_record_call(ain)
+
+            logger.info(f"Call scheduled, call_sid = {call_sid}")
+
+            return call_sid
+
+        except Exception:
+            msg = "Error placing call"
+            self.update_state(
+                task_id=outer_task_id,
+                state=State.calling_error,
+                meta={"error_message": msg},
+            )
+            raise
 
 
 class CheckCallProgress(Task):
