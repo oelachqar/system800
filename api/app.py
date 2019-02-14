@@ -9,7 +9,6 @@ from flask_httpauth import HTTPBasicAuth, HTTPTokenAuth
 import jwt
 from werkzeug.security import check_password_hash
 
-
 from api.celery_app import make_celery
 from api.state import State
 from api.tasks import (
@@ -22,9 +21,8 @@ from api.tasks import (
     TranscribeCall,
     logger,
 )
-from config import Config
-
 from api.validate_input import validate_ain, validate_callback_url
+from config import Config
 
 
 #

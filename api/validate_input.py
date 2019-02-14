@@ -1,6 +1,8 @@
 from urllib.parse import urlparse
-from api.state import State
+
 from flask import jsonify
+
+from api.state import State
 
 
 def validate_ain(ain):
