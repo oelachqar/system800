@@ -10,7 +10,12 @@ class MyTest(unittest.TestCase):
     def test_basic(self):
         self.assertEqual(
             location_info.extract_location("Washington 98102"),
-            {"State": "WA", "Zipcode": "98102", "City": "Seattle", "Confidence_location": "high"},
+            {
+                "State": "WA",
+                "Zipcode": "98102",
+                "City": "Seattle",
+                "Confidence_location": "high",
+            },
         )
 
     def test_checkCapitalization(self):
@@ -41,7 +46,8 @@ class MyTest(unittest.TestCase):
             location_info.extract_location("Washington DC 20022")["Zipcode"], "20022"
         )
         self.assertEqual(
-            location_info.extract_location("Princeton New Jersey 08540")["Zipcode"], "08540"
+            location_info.extract_location("Princeton New Jersey 08540")["Zipcode"],
+            "08540",
         )
 
 

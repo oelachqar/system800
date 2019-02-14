@@ -5,6 +5,7 @@ class State(object):
 
     new = "new"
     calling = "calling"
+    calling_error = "calling_error"
     recording_ready = "recording_ready"
     transcribing = "transcribing_recording"
     transcribing_failed = "transcribing_failed"
@@ -12,4 +13,6 @@ class State(object):
     extracting = "extracting_info"
     extracting_done = "extracting_done"
     error = "error"
+    user_error = "user_error"
+    user_not_authorized = "user_not_authorized"
     failed_to_return_info = "failed_to_return_info"

@@ -1,19 +1,16 @@
-from api.state import State
+import requests
 
 from celery import Task
 from celery.exceptions import MaxRetriesExceededError
 from celery.utils.log import get_task_logger
-
-from config import Config
-
-import requests
-
 from twilio.rest.api.v2010.account.call import CallInstance
 
+from api.state import State
+from config import Config
 from workflow.call.twilio_call_wrapper import TwilioCallWrapper
 from workflow.extract import date_info, location_info
-from workflow.transcribe.google_tts import GoogleTranscriber
-from workflow.transcribe import exceptions as TTSExceptions
+from workflow.transcribe import exceptions
+from workflow.transcribe.google_transcribe import GoogleTranscriber
 
 
 logger = get_task_logger("app")
@@ -29,7 +26,7 @@ twilio = TwilioCallWrapper(
 
 TwilioCallStatus = CallInstance.Status
 
-tts = GoogleTranscriber(
+transcriber = GoogleTranscriber(
     Config.google_credentials_json, None
 )  # preferred phrases None for now
 
@@ -44,15 +41,26 @@ class InitiateCall(Task):
     track_started = True
 
     def run(self, ain, *, outer_task_id):
-        logger.info(f"Call task got ain = {ain}")
 
-        self.update_state(task_id=outer_task_id, state=State.calling)
+        try:
+            logger.info(f"Call task got ain = {ain}")
 
-        call_sid = twilio.place_and_record_call(ain)
+            self.update_state(task_id=outer_task_id, state=State.calling)
 
-        logger.info(f"Call scheduled, call_sid = {call_sid}")
+            call_sid = twilio.place_and_record_call(ain)
 
-        return call_sid
+            logger.info(f"Call scheduled, call_sid = {call_sid}")
+
+            return call_sid
+
+        except Exception:
+            msg = "Error placing call"
+            self.update_state(
+                task_id=outer_task_id,
+                state=State.calling_error,
+                meta={"error_message": msg},
+            )
+            raise
 
 
 class CheckCallProgress(Task):
@@ -150,8 +158,8 @@ class TranscribeCall(Task):
 
     # TODO
     # Ensure we only send < 1 min of audio to be transcribed -- otherwise we
-    # need to make an async call to the tts service (and not use speech rec
-    # package).
+    # need to make an async call to the speech to text service
+    # (and not use speech rec package).
 
     # TODO
     # Looks like retry_backoff and retry_jitter are not respected by self.retry()
@@ -173,7 +181,7 @@ class TranscribeCall(Task):
         self.update_state(task_id=outer_task_id, state=State.transcribing)
 
         try:
-            text = tts.transcribe_audio_at_uri(recording_uri)
+            text = transcriber.transcribe_audio_at_uri(recording_uri)
 
             logger.info(f"Transcript = {text}")
 
@@ -181,7 +189,7 @@ class TranscribeCall(Task):
 
             return {"call_sid": call_sid, "text": text}
 
-        except TTSExceptions.RequestError as exc:
+        except exceptions.RequestError as exc:
             # we retry on request errors
             raise self.retry(exc=exc, countdown=10)
 
@@ -198,14 +206,15 @@ class ExtractInfo(Task):
     track_started = True
 
     def run(self, request, *, outer_task_id):
-        """ 
-        returns dictionary with transcription text and keys relating to extracted date and location info
+        """
+        returns dictionary with transcription text and keys relating to extracted date
+        and location info.
         all key values (except transcription text) are None if extraction fails
         """
         text = request.get("text")
         logger.info(f"Extract got text = {text}.")
         self.update_state(task_id=outer_task_id, state=State.extracting)
-        d = {"trancription":text}
+        d = {"trancription": text}
         date = date_info.extract_date_time(text)
         d.update(date)
         location = location_info.extract_location(text)

@@ -1,13 +1,19 @@
-
 import calendar
-import dateutil.parser as dparser
 from datetime import datetime
 import re
 
-from workflow.extract.utils import years_to_digits, ordinals_to_ordinals, hour_with_min_to_time, wordnums_to_nums, replace_homonyms
+import dateutil.parser as dparser
+
+from workflow.extract.utils import (
+    years_to_digits,
+    ordinals_to_ordinals,
+    hour_with_min_to_time,
+    wordnums_to_nums,
+    replace_homonyms,
+)
 
 
-#not used by Google
+# not used by Google
 def create_digits_for_date_parsing(s):
     """ Examples:
     'april thirteenth two thousand sixteen at two thirty PM'
@@ -45,8 +51,8 @@ def get_re_for_date_parsing():
     and
         'april 3rd, 2017 at 1:30 p.m.'
     """
-    months = list(map(lambda x: x.lower(), list(calendar.month_name)[1:])) # py 3
-    months_or = '|'.join(months)
+    months = list(map(lambda x: x.lower(), list(calendar.month_name)[1:]))  # py 3
+    months_or = "|".join(months)
     return r"(?=((?:{months_or}) .*? (?:a\.m\.|p\.m\.|am|pm)))".format(**locals())
 
 
@@ -86,20 +92,19 @@ def extract_date_time_base(s, words_to_nums=False):
 
     Loops through possible dates, returns as soon as dparser succeeds in
     parsing date.
-    
-    The parser seems to always return something, e.g. 
+
+    The parser seems to always return something, e.g.
     'on march 2021 at 4:30 pm' -->
     {'year': 2021, 'month': 3, 'day': 2, 'hour': 16, 'minute': 30}
     even though 'day' should be None.
 
-    We get around this problem by adding two different defaults and checking if the dict returned are the same.
-    
-
+    We get around this problem by adding two different defaults and checking if the
+    dict returned are the same.
     """
     possible_dates = find_possible_date_times(s, words_to_nums)
     default_1 = datetime(1900, 1, 1, 0, 0)
     default_2 = datetime(1999, 12, 25, 23, 0)
-    fields = ['year', 'month', 'day', 'hour', 'minute']
+    fields = ["year", "month", "day", "hour", "minute"]
     d = {}
     for field in fields:
         d[field] = None
@@ -107,15 +112,14 @@ def extract_date_time_base(s, words_to_nums=False):
         try:
             dt_1 = dparser.parse(date, default=default_1)
             dt_2 = dparser.parse(date, default=default_2)
-            #populate dictionary with date info
+            # populate dictionary with date info
             for key in d:
                 if dt_1.__getattribute__(key) == dt_2.__getattribute__(key):
                     d[key] = dt_1.__getattribute__(key)
-                else:
-                	different = 1
             d["minute"] = dt_1.minute
             return d
-        except:
+        except Exception:
+            # Unable to parse date
             pass
     return d
 
@@ -124,10 +128,11 @@ def extract_date_time(s):
     """ If extract_date_time_base doesn't succeed, try again having replaced
     homonyms.
     """
-    return (extract_date_time_base(s) or
-           extract_date_time_base(replace_homonyms(s), words_to_nums=True) or
-           {'year': None, 'month': None, 'day': None,
-            'hour': None, 'minute': None})
+    return (
+        extract_date_time_base(s)
+        or extract_date_time_base(replace_homonyms(s), words_to_nums=True)
+        or {"year": None, "month": None, "day": None, "hour": None, "minute": None}
+    )
     # return (extract_date_time_base(s) or
     #         extract_date_time_base(replace_homonyms(s), words_to_nums=True) or
     #         None)
@@ -135,12 +140,14 @@ def extract_date_time(s):
 
 if __name__ == "__main__":
     ss = [
-        'your next Master hearing date January 19th 2018 at 3 p.m. for Gymboree',
-        'twenty third street january seventh at ate a.m.',
-        'march avenue february two thousand and twenty at nine a.m.',
-        ('judge may smith at address involving march and 23rd st '
-         'on May 10th 2018 at 3 p.m.'),
+        "your next Master hearing date January 19th 2018 at 3 p.m. for Gymboree",
+        "twenty third street january seventh at ate a.m.",
+        "march avenue february two thousand and twenty at nine a.m.",
+        (
+            "judge may smith at address involving march and 23rd st "
+            "on May 10th 2018 at 3 p.m."
+        ),
     ]
     for s in ss:
-        print('\n' + s)
+        print("\n" + s)
         print(extract_date_time(s))
