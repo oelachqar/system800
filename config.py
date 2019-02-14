@@ -31,6 +31,10 @@ class Config(object):
     celery_result_backend = os.getenv("CELERY_RESULT_BACKEND")
     celery_timezone = "UTC"
 
+    # auth temporary
+    auth_user = os.getenv("AUTH_USER")
+    auth_password_hash = os.getenv("AUTH_PASSWORD_HASH")
+
 
 class TestConfig(Config):
     # call testing

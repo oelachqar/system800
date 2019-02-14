@@ -1,5 +1,6 @@
 import requests
 import time
+from urllib.parse import urlparse
 from uuid import uuid4
 
 from celery import chain, group
@@ -7,8 +8,8 @@ from celery.result import AsyncResult
 from flask import Flask, g, jsonify, request
 from flask_httpauth import HTTPBasicAuth, HTTPTokenAuth
 import jwt
-from werkzeug.http import HTTP_STATUS_CODES
-from urllib.parse import urlparse
+from werkzeug.security import check_password_hash
+
 
 from api.celery_app import make_celery
 from api.state import State
@@ -91,9 +92,13 @@ def dummy_task(ain, callback_url, outer_task_id):
 #
 @basic_auth.verify_password
 def verify_password(username, password):
-    # TODO implement a proper check
-    g.curent_user = {"user_id": 123, "has_access": True}
-    return True
+    if username == Config.auth_user and check_password_hash(
+        Config.auth_password_hash, password
+    ):
+        g.curent_user = {"has_access": True}
+        return True
+
+    return False
 
 
 @basic_auth.error_handler
@@ -116,10 +121,7 @@ def verify_token(token):
     except (jwt.DecodeError, jwt.ExpiredSignatureError):
         return False
 
-    g.current_user = {
-        "user_id": payload["user_id"],
-        "has_access": payload["has_access"],
-    }
+    g.current_user = {"has_access": payload["has_access"]}
     return True
 
 
@@ -140,7 +142,6 @@ def get_token():
     user = g.curent_user
     token = jwt.encode(
         {
-            "user_id": user["user_id"],
             "has_access": user["has_access"],
             "exp": time.time() + Config.token_expiration_seconds,
         },
