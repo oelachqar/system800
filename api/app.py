@@ -159,7 +159,7 @@ def process():
     if not g.current_user["has_access"]:
         msg = "The current user is not authorized to make this request"
         response = jsonify({"state": State.user_not_authorized, "error_message": msg})
-        response.status_code = 401
+        response.status_code = 403
         return response
 
     ain = request.values.get("ain")
