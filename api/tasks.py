@@ -1,3 +1,4 @@
+import random
 import requests
 
 from celery import Task
@@ -7,9 +8,10 @@ from twilio.rest.api.v2010.account.call import CallInstance
 
 from api.state import State
 from config import Config
+from workflow.call import exceptions as CallExceptions
 from workflow.call.twilio_call_wrapper import TwilioCallWrapper
 from workflow.extract import date_info, location_info
-from workflow.transcribe import exceptions
+from workflow.transcribe import exceptions as TranscribeExceptions
 from workflow.transcribe.google_transcribe import GoogleTranscriber
 
 
@@ -31,6 +33,22 @@ transcriber = GoogleTranscriber(
 )  # preferred phrases None for now
 
 
+def get_countdown(retry_backoff, current_retries, retry_jitter, retry_backoff_max):
+    # class variables below don't work for self.retry()
+    # https://stackoverflow.com/questions/9731435/retry-celery-tasks-with-exponential-back-off#comment90534054_46467851
+
+    # Following:
+    # https://stackoverflow.com/a/9752811
+    # https://celery.readthedocs.io/en/latest/userguide/tasks.html#Task.retry_backoff
+
+    result = min(retry_backoff_max, retry_backoff * (2 ** current_retries))
+
+    if retry_jitter:
+        result += int(random.uniform(0, result / 4.0))
+
+    return result
+
+
 class InitiateCall(Task):
     """
         Schedules a call and returns the call sid.
@@ -41,7 +59,6 @@ class InitiateCall(Task):
     track_started = True
 
     def run(self, ain, *, outer_task_id):
-
         try:
             logger.info(f"Call task got ain = {ain}")
 
@@ -68,9 +85,12 @@ class CheckCallProgress(Task):
     """
 
     max_retries = 10
-    retry_backoff = 10
+    retry_backoff = 30
     retry_jitter = True
+    retry_backoff_max = 600
     track_started = True
+
+    default_error_message = "Error checking call completion"
 
     failed_call_states = [
         TwilioCallStatus.BUSY,
@@ -86,33 +106,52 @@ class CheckCallProgress(Task):
     ]
 
     def run(self, call_sid, *, outer_task_id):
-        status = twilio.fetch_status(call_sid)
-        logger.info(f'Status of call {call_sid} is "{status}"')
+        try:
+            status = twilio.fetch_status(call_sid)
+            logger.info(f'Status of call {call_sid} is "{status}"')
 
-        if status in self.in_progress_call_states:
+            if status in self.in_progress_call_states:
+                raise CallExceptions.CallInProgress
+
+            if status in self.failed_call_states:
+                logger.error(f'Failed call status: "{status}"')
+                raise CallExceptions.CallFailed
+
+            if status != TwilioCallStatus.COMPLETED:
+                # treat unexpected status as an error
+                logger.error(f'Unexpected call status: "{status}"')
+                raise CallExceptions.UnknownError
+
+            # the call has completed if we got this far
+            self.update_state(task_id=outer_task_id, state=State.call_complete)
+            return call_sid
+
+        except CallExceptions.CallInProgress:
+            # we retry if call in progress, up to max retries
             try:
-                logger.info("Will retry")
-                self.retry(countdown=10)
+                countdown = get_countdown(
+                    self.retry_backoff,
+                    self.request.retries,
+                    self.retry_jitter,
+                    self.retry_backoff_max,
+                )
+                self.retry(countdown=countdown)
 
             except MaxRetriesExceededError:
-                logger.info(f"Exceeded max retries, giving up")
-                self.update_state(task_id=outer_task_id, state=State.error)
-                return call_sid
+                self.update_state(
+                    task_id=outer_task_id,
+                    state=State.calling_error,
+                    meta={"error_message": self.default_error_message},
+                )
+                raise
 
-        if status in self.failed_call_states:
-            self.update_state(task_id=outer_task_id, state=State.error)
-            logger.error(f'Error call status: "{status}"')
-            return call_sid
-
-        elif status == TwilioCallStatus.COMPLETED:
-            self.update_state(task_id=outer_task_id, state=State.error)
-            return call_sid
-
-        else:
-            # treat unexpected status as an error
-            logger.error(f'Unexpected call status: "{status}"')
-            self.update_state(task_id=outer_task_id, state=State.error)
-            return call_sid
+        except Exception:
+            self.update_state(
+                task_id=outer_task_id,
+                state=State.calling_error,
+                meta={"error_message": self.default_error_message},
+            )
+            raise
 
 
 class PullRecording(Task):
@@ -189,7 +228,7 @@ class TranscribeCall(Task):
 
             return {"call_sid": call_sid, "text": text}
 
-        except exceptions.RequestError as exc:
+        except TranscribeExceptions.RequestError as exc:
             # we retry on request errors
             raise self.retry(exc=exc, countdown=10)
 

@@ -14,7 +14,7 @@ class Config(object):
     call_twilio_local_number = os.getenv("CALL_TWILIO_LOCAL_NUMBER")
     call_number_to_call = os.getenv("CALL_NUMBER_TO_CALL")
     call_final_pause_secs = os.getenv("CALL_FINAL_PAUSE", 45)
-    call_initial_pause_secs = os.getenv("CALL_INITIAL_PAUSE")
+    call_initial_pause_secs = os.getenv("CALL_INITIAL_PAUSE", 0)
 
     # tokens
     token_secret_key = os.getenv("TOKEN_SECRET_KEY")
