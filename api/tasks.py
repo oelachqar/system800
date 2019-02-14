@@ -200,11 +200,9 @@ class TranscribeCall(Task):
     # need to make an async call to the speech to text service
     # (and not use speech rec package).
 
-    # TODO
-    # Looks like retry_backoff and retry_jitter are not respected by self.retry()
-    # https://stackoverflow.com/questions/9731435/retry-celery-tasks-with-exponential-back-off#comment90534054_46467851
     track_started = True
     retry_backoff = 4
+    retry_backoff_max = 300
     retry_jitter = True
     max_retries = 5
 
@@ -230,7 +228,13 @@ class TranscribeCall(Task):
 
         except TranscribeExceptions.RequestError as exc:
             # we retry on request errors
-            raise self.retry(exc=exc, countdown=10)
+            countdown = get_countdown(
+                self.retry_backoff,
+                self.request.retries,
+                self.retry_jitter,
+                self.retry_backoff_max,
+            )
+            raise self.retry(exc=exc, countdown=countdown)
 
         except Exception as exc:
             # for other errors (unintelligible audio etc) we don't retry
