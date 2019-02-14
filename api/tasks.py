@@ -47,8 +47,6 @@ class InitiateCall(Task):
 
             self.update_state(task_id=outer_task_id, state=State.calling)
 
-            raise ValueError("aggghh")
-
             call_sid = twilio.place_and_record_call(ain)
 
             logger.info(f"Call scheduled, call_sid = {call_sid}")
