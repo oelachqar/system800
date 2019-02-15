@@ -90,14 +90,19 @@ def send_error(request, exc, traceback, ain, callback_url):
 
 
 @celery.task()
-def dummy_task(ain, callback_url, outer_task_id):
+def dummy_task(prev, ain, callback_url, outer_task_id):
     """ So that we can an assign a task id to a workflow containing a group
     """
+
     logger.info(
         f"All tasks for ain: {ain}, callback_url: {callback_url}, "
         f"task_id: {outer_task_id} done."
     )
-    return None
+
+    # prev contains the output of the two previous tasks, but the order is
+    # not always as expected https://github.com/celery/celery/issues/3781.
+    # However delete_recordings returns None
+    return prev[0] if prev[0] else prev[1]
 
 
 #
@@ -234,7 +239,7 @@ def process():
             ),
             delete_recordings.s(),
         ),
-        dummy_task.si(ain, callback_url, outer_task_id=task_id),
+        dummy_task.s(ain, callback_url, outer_task_id=task_id),
     ).apply_async(task_id=task_id)
 
     return jsonify({"ain": ain, "task_id": result.task_id, "state": result.state})
@@ -244,8 +249,8 @@ def process():
 @token_auth.login_required
 def status(task_id):
     result = AsyncResult(task_id)
-
-    return jsonify({"task_id": result.task_id, "state": result.state})
+    data = result.info  # stores either the final result, or intermediate metadata
+    return jsonify({"task_id": result.task_id, "state": result.state, "data": data})
 
 
 @app.route("/debug_callback", methods=["POST"])
