@@ -1,4 +1,5 @@
 import datetime
+import json
 import requests
 from uuid import uuid4
 
@@ -249,7 +250,16 @@ def process():
 @token_auth.login_required
 def status(task_id):
     result = AsyncResult(task_id)
-    data = result.info  # stores either the final result, or intermediate metadata
+
+    # result.info stores either the final result, intermediate metadata, or an exception
+    data = result.info
+
+    # ensure the data is json serialable (will fail for exceptions)
+    try:
+        json.dumps(data)
+    except Exception:
+        data = None
+
     return jsonify({"task_id": result.task_id, "state": result.state, "data": data})
 
 
