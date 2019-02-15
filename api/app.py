@@ -91,14 +91,11 @@ def send_error(request, exc, traceback, ain, callback_url):
 
 
 @celery.task()
-def dummy_task(prev, ain, callback_url, *, outer_task_id):
+def dummy_task(prev, ain, callback_url):
     """ So that we can an assign a task id to a workflow containing a group
     """
 
-    logger.info(
-        f"All tasks for ain: {ain}, callback_url: {callback_url}, "
-        f"task_id: {outer_task_id} done."
-    )
+    logger.info(f"All tasks for ain: {ain}, callback_url: {callback_url} are done.")
 
     # prev contains the output of the two previous tasks, but the order is
     # not always as expected https://github.com/celery/celery/issues/3781.
@@ -240,7 +237,7 @@ def process():
             ),
             delete_recordings.s(),
         ),
-        dummy_task.s(ain, callback_url, outer_task_id=task_id),
+        dummy_task.s(ain, callback_url),
     ).apply_async(task_id=task_id)
 
     return jsonify({"ain": ain, "task_id": result.task_id, "state": result.state})
