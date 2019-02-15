@@ -91,7 +91,7 @@ def send_error(request, exc, traceback, ain, callback_url):
 
 
 @celery.task()
-def dummy_task(prev, ain, callback_url, outer_task_id):
+def dummy_task(prev, ain, callback_url, *, outer_task_id):
     """ So that we can an assign a task id to a workflow containing a group
     """
 
