@@ -90,19 +90,6 @@ def send_error(request, exc, traceback, ain, callback_url):
     requests.post(callback_url, json=data)
 
 
-@celery.task()
-def dummy_task(prev, ain, callback_url):
-    """ So that we can an assign a task id to a workflow containing a group
-    """
-
-    logger.info(f"All tasks for ain: {ain}, callback_url: {callback_url} are done.")
-
-    # prev contains the output of the two previous tasks, but the order is
-    # not always as expected https://github.com/celery/celery/issues/3781.
-    # However delete_recordings returns None
-    return prev[0] if prev[0] else prev[1]
-
-
 #
 # Authentication
 #
