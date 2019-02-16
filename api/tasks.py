@@ -1,5 +1,6 @@
 import random
 import requests
+from requests.exceptions import RequestException
 
 from celery import Task
 from celery.exceptions import MaxRetriesExceededError
@@ -126,8 +127,8 @@ class CheckCallProgress(Task):
             self.update_state(task_id=outer_task_id, state=State.call_complete)
             return call_sid
 
-        except CallExceptions.CallInProgress:
-            # we retry if call in progress, up to max retries
+        except (CallExceptions.CallInProgress, RequestException):
+            # we retry if call in progress, or on request exceptions up to max retries
             try:
                 countdown = get_countdown(
                     self.retry_backoff,
