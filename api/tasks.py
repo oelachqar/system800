@@ -243,14 +243,39 @@ class DeleteRecordings(Task):
     """ Deletes all recordings associated to a given call sid.
     """
 
+    max_retries = 10
+    retry_backoff = 30
+    retry_jitter = True
+    retry_backoff_max = 600
+
     def run(self, request):
         call_sid = request.get("call_sid")
-        logger.info(f"Delete recordings task got call_sid = {call_sid}.")
 
-        call = twilio.fetch_call(call_sid)
+        try:
+            logger.info(f"Delete recordings task got call_sid = {call_sid}.")
 
-        for recording in call.recordings.list():
-            recording.delete()
+            call = twilio.fetch_call(call_sid)
+
+            for recording in call.recordings.list():
+                recording.delete()
+
+        # We retry on request exceptions up to max retries, and for other exceptions
+        # we don't re-raise because we want the dummy task that follows to execute.
+        except RequestException:
+            try:
+                countdown = get_countdown(
+                    self.retry_backoff,
+                    self.request.retries,
+                    self.retry_jitter,
+                    self.retry_backoff_max,
+                )
+                self.retry(countdown=countdown)
+
+            except MaxRetriesExceededError:
+                logger.error(f"Failed to delete recordings for call {call_sid}")
+
+        except Exception:
+            logger.error(f"Failed to delete recordings for call {call_sid}")
 
 
 class TranscribeCall(Task):
