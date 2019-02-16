@@ -1,5 +1,6 @@
 import random
 import requests
+from requests.exceptions import RequestException
 
 from celery import Task
 from celery.exceptions import MaxRetriesExceededError
@@ -56,7 +57,15 @@ class InitiateCall(Task):
     """
 
     rate_limit = "1/s"
+
+    max_retries = 10
+    retry_backoff = 30
+    retry_jitter = True
+    retry_backoff_max = 600
+
     track_started = True
+
+    default_error_message = "Error placing call"
 
     def run(self, ain, *, outer_task_id):
         try:
@@ -70,12 +79,30 @@ class InitiateCall(Task):
 
             return call_sid
 
+        except RequestException:
+            # we retry on request exceptions up to max retries
+            try:
+                countdown = get_countdown(
+                    self.retry_backoff,
+                    self.request.retries,
+                    self.retry_jitter,
+                    self.retry_backoff_max,
+                )
+                self.retry(countdown=countdown)
+
+            except MaxRetriesExceededError:
+                self.update_state(
+                    task_id=outer_task_id,
+                    state=State.calling_error,
+                    meta={"error_message": self.default_error_message},
+                )
+                raise
+
         except Exception:
-            msg = "Error placing call"
             self.update_state(
                 task_id=outer_task_id,
                 state=State.calling_error,
-                meta={"error_message": msg},
+                meta={"error_message": self.default_error_message},
             )
             raise
 
@@ -88,6 +115,7 @@ class CheckCallProgress(Task):
     retry_backoff = 30
     retry_jitter = True
     retry_backoff_max = 600
+
     track_started = True
 
     default_error_message = "Error checking call completion"
@@ -126,8 +154,8 @@ class CheckCallProgress(Task):
             self.update_state(task_id=outer_task_id, state=State.call_complete)
             return call_sid
 
-        except CallExceptions.CallInProgress:
-            # we retry if call in progress, up to max retries
+        except (CallExceptions.CallInProgress, RequestException):
+            # we retry if call in progress, or on request exceptions up to max retries
             try:
                 countdown = get_countdown(
                     self.retry_backoff,
@@ -155,40 +183,107 @@ class CheckCallProgress(Task):
 
 
 class PullRecording(Task):
+
+    max_retries = 10
+    retry_backoff = 30
+    retry_jitter = True
+    retry_backoff_max = 600
+
     track_started = True
+
+    default_error_message = "Error retrieving call recording"
 
     def run(self, call_sid, *, outer_task_id):
         # call has completed, find the recording uri
-        recordings = twilio.fetch_recordings(call_sid)
-        recording_uri = ""
-        if not recordings:
-            logger.error(f"Call {call_sid} completed with no recording")
+        try:
+            recordings = twilio.fetch_recordings(call_sid)
 
-            self.update_state(task_id=outer_task_id, state=State.error)
+            if not recordings or len(recordings) == 0:
+                logger.error(f"Call {call_sid} completed with no recording")
 
-            return {"call_sid": call_sid, "recording_uri": recording_uri}
+                raise CallExceptions.NoRecording
 
-        else:
             recording_uri = twilio.get_full_recording_uri(recordings[0])
+
             logger.info(f"Got recording_uri = {recording_uri}")
 
             self.update_state(task_id=outer_task_id, state=State.recording_ready)
 
             return {"call_sid": call_sid, "recording_uri": recording_uri}
 
+        except RequestException:
+            # we retry on request exceptions up to max retries
+            try:
+                countdown = get_countdown(
+                    self.retry_backoff,
+                    self.request.retries,
+                    self.retry_jitter,
+                    self.retry_backoff_max,
+                )
+                self.retry(countdown=countdown)
+
+            except MaxRetriesExceededError:
+                self.update_state(
+                    task_id=outer_task_id,
+                    state=State.recording_retrieval_error,
+                    meta={"error_message": self.default_error_message},
+                )
+                raise
+
+        except Exception:
+            self.update_state(
+                task_id=outer_task_id,
+                state=State.recording_retrieval_error,
+                meta={"error_message": self.default_error_message},
+            )
+            raise
+
 
 class DeleteRecordings(Task):
     """ Deletes all recordings associated to a given call sid.
     """
 
+    max_retries = 10
+    retry_backoff = 30
+    retry_jitter = True
+    retry_backoff_max = 600
+
     def run(self, request):
+        # We attempt to delete all recordings for the given call, and we return
+        # the given data as the overall result for the chain.
+
         call_sid = request.get("call_sid")
-        logger.info(f"Delete recordings task got call_sid = {call_sid}.")
+        data = request.get("data")
 
-        call = twilio.fetch_call(call_sid)
+        try:
+            logger.info(f"Delete recordings task got call_sid = {call_sid}.")
 
-        for recording in call.recordings.list():
-            recording.delete()
+            call = twilio.fetch_call(call_sid)
+
+            for recording in call.recordings.list():
+                recording.delete()
+
+            return data
+
+        # We retry on request exceptions up to max retries, and for other exceptions
+        # we don't re-raise
+        except RequestException:
+            try:
+                countdown = get_countdown(
+                    self.retry_backoff,
+                    self.request.retries,
+                    self.retry_jitter,
+                    self.retry_backoff_max,
+                )
+                self.retry(countdown=countdown)
+
+            except MaxRetriesExceededError:
+                logger.error(f"Failed to delete recordings for call {call_sid}")
+                return data
+
+        except Exception:
+            logger.error(f"Failed to delete recordings for call {call_sid}")
+            return data
 
 
 class TranscribeCall(Task):
@@ -204,20 +299,16 @@ class TranscribeCall(Task):
     retry_backoff = 4
     retry_backoff_max = 300
     retry_jitter = True
+
     max_retries = 5
 
     def run(self, request, *, outer_task_id):
-        call_sid = request.get("call_sid")
-        recording_uri = request.get("recording_uri")
-
-        logger.info(
-            f"Transcribe task got call_sid = {call_sid}, "
-            f"recording_uri = {recording_uri}."
-        )
-
-        self.update_state(task_id=outer_task_id, state=State.transcribing)
-
         try:
+            call_sid = request.get("call_sid")
+            recording_uri = request.get("recording_uri")
+
+            self.update_state(task_id=outer_task_id, state=State.transcribing)
+
             text = transcriber.transcribe_audio_at_uri(recording_uri)
 
             logger.info(f"Transcript = {text}")
@@ -226,22 +317,26 @@ class TranscribeCall(Task):
 
             return {"call_sid": call_sid, "text": text}
 
-        except TranscribeExceptions.RequestError as exc:
+        except TranscribeExceptions.RequestError:
             # we retry on request errors
-            countdown = get_countdown(
-                self.retry_backoff,
-                self.request.retries,
-                self.retry_jitter,
-                self.retry_backoff_max,
-            )
-            raise self.retry(exc=exc, countdown=countdown)
+            try:
+                countdown = get_countdown(
+                    self.retry_backoff,
+                    self.request.retries,
+                    self.retry_jitter,
+                    self.retry_backoff_max,
+                )
+                self.retry(countdown=countdown)
 
-        except Exception as exc:
+            except MaxRetriesExceededError:
+                self.update_state(
+                    task_id=outer_task_id, state=State.transcribing_failed
+                )
+                raise
+
+        except Exception:
             # for other errors (unintelligible audio etc) we don't retry
-            logger.error(f"Transcription error: {exc}")
-
             self.update_state(task_id=outer_task_id, state=State.transcribing_failed)
-
             raise
 
 
@@ -254,26 +349,77 @@ class ExtractInfo(Task):
         and location info.
         all key values (except transcription text) are None if extraction fails
         """
+
         text = request.get("text")
+        call_sid = request.get("call_sid")
+
         logger.info(f"Extract got text = {text}.")
         self.update_state(task_id=outer_task_id, state=State.extracting)
+
         d = {"trancription": text}
+
         date = date_info.extract_date_time(text)
         d.update(date)
+
         location = location_info.extract_location(text)
         d.update(location)
+
         logger.info(f"Date = {date}. Location = {location}")
         self.update_state(task_id=outer_task_id, state=State.extracting_done)
-        return d
+
+        return {"call_sid": call_sid, "data": d}
 
 
 class SendResult(Task):
+
+    max_retries = 10
+    retry_backoff = 30
+    retry_jitter = True
+    retry_backoff_max = 600
+
+    default_error_message = "Sending data to callback url failed"
+
     track_started = True
 
-    def run(self, data, ain, callback_url, *, outer_task_id):
-        logger.info(
-            f"Send task got ain = {ain}, callback_url = {callback_url}, data = {data}."
-        )
-        requests.post(callback_url, json=data)
-        logger.info(f"Sending data {data} done.")
-        return data
+    def run(self, request, ain, callback_url, *, outer_task_id):
+        try:
+            data = request.get("data")
+
+            logger.info(
+                f"Send task got ain = {ain}, callback_url = {callback_url}, "
+                f"data = {data}."
+            )
+            requests.post(callback_url, json=data)
+
+            self.update_state(
+                task_id=outer_task_id, state=State.sending_to_callback_done
+            )
+
+            return request
+
+        except RequestException:
+            # we retry on request errors
+            try:
+                countdown = get_countdown(
+                    self.retry_backoff,
+                    self.request.retries,
+                    self.retry_jitter,
+                    self.retry_backoff_max,
+                )
+                self.retry(countdown=countdown)
+
+            except MaxRetriesExceededError:
+                self.update_state(
+                    task_id=outer_task_id,
+                    state=State.sending_to_callback_error,
+                    meta={"error_message": self.default_error_message, "data": data},
+                )
+                raise
+
+        except Exception:
+            self.update_state(
+                task_id=outer_task_id,
+                state=State.sending_to_callback_error,
+                meta={"error_message": self.default_error_message, "data": data},
+            )
+            raise

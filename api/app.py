@@ -90,22 +90,6 @@ def send_error(request, exc, traceback, ain, callback_url):
     requests.post(callback_url, json=data)
 
 
-@celery.task()
-def dummy_task(prev, ain, callback_url, outer_task_id):
-    """ So that we can an assign a task id to a workflow containing a group
-    """
-
-    logger.info(
-        f"All tasks for ain: {ain}, callback_url: {callback_url}, "
-        f"task_id: {outer_task_id} done."
-    )
-
-    # prev contains the output of the two previous tasks, but the order is
-    # not always as expected https://github.com/celery/celery/issues/3781.
-    # However delete_recordings returns None
-    return prev[0] if prev[0] else prev[1]
-
-
 #
 # Authentication
 #
@@ -206,9 +190,9 @@ def process():
 
     """
     Workflow:
-    place_call* - check_call_done* - get_recording* - transcribe* - extract* - send
-                                                         |                      |
-                                                      delete_recording -----  dummy
+    place_call* - check_call_done* - get_recording* - ...
+    ... - transcribe* - extract* - send* - delete_recording
+
 
     *: after failure, we invoke send_error to inform caller of error
     """
@@ -231,16 +215,13 @@ def process():
         transcribe.s(outer_task_id=task_id).set(
             link_error=send_error.s(ain, callback_url)
         ),
-        group(
-            chain(
-                extract_info.s(outer_task_id=task_id).set(
-                    link_error=send_error.s(ain, callback_url)
-                ),
-                send_result.s(ain, callback_url, outer_task_id=task_id),
-            ),
-            delete_recordings.s(),
+        extract_info.s(outer_task_id=task_id).set(
+            link_error=send_error.s(ain, callback_url)
         ),
-        dummy_task.s(ain, callback_url, outer_task_id=task_id),
+        send_result.s(ain, callback_url, outer_task_id=task_id).set(
+            link_error=send_error.s(ain, callback_url)
+        ),
+        delete_recordings.s(),
     ).apply_async(task_id=task_id)
 
     return jsonify({"ain": ain, "task_id": result.task_id, "state": result.state})
