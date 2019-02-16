@@ -263,6 +263,8 @@ class DeleteRecordings(Task):
             for recording in call.recordings.list():
                 recording.delete()
 
+            return data
+
         # We retry on request exceptions up to max retries, and for other exceptions
         # we don't re-raise
         except RequestException:
