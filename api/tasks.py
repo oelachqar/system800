@@ -57,7 +57,15 @@ class InitiateCall(Task):
     """
 
     rate_limit = "1/s"
+
+    max_retries = 10
+    retry_backoff = 30
+    retry_jitter = True
+    retry_backoff_max = 600
+
     track_started = True
+
+    default_error_message = "Error placing call"
 
     def run(self, ain, *, outer_task_id):
         try:
@@ -71,12 +79,30 @@ class InitiateCall(Task):
 
             return call_sid
 
+        except RequestException:
+            # we retry on request exceptions up to max retries
+            try:
+                countdown = get_countdown(
+                    self.retry_backoff,
+                    self.request.retries,
+                    self.retry_jitter,
+                    self.retry_backoff_max,
+                )
+                self.retry(countdown=countdown)
+
+            except MaxRetriesExceededError:
+                self.update_state(
+                    task_id=outer_task_id,
+                    state=State.calling_error,
+                    meta={"error_message": self.default_error_message},
+                )
+                raise
+
         except Exception:
-            msg = "Error placing call"
             self.update_state(
                 task_id=outer_task_id,
                 state=State.calling_error,
-                meta={"error_message": msg},
+                meta={"error_message": self.default_error_message},
             )
             raise
 
@@ -89,6 +115,7 @@ class CheckCallProgress(Task):
     retry_backoff = 30
     retry_jitter = True
     retry_backoff_max = 600
+
     track_started = True
 
     default_error_message = "Error checking call completion"
