@@ -291,20 +291,16 @@ class TranscribeCall(Task):
     retry_backoff = 4
     retry_backoff_max = 300
     retry_jitter = True
+
     max_retries = 5
 
     def run(self, request, *, outer_task_id):
-        call_sid = request.get("call_sid")
-        recording_uri = request.get("recording_uri")
-
-        logger.info(
-            f"Transcribe task got call_sid = {call_sid}, "
-            f"recording_uri = {recording_uri}."
-        )
-
-        self.update_state(task_id=outer_task_id, state=State.transcribing)
-
         try:
+            call_sid = request.get("call_sid")
+            recording_uri = request.get("recording_uri")
+
+            self.update_state(task_id=outer_task_id, state=State.transcribing)
+
             text = transcriber.transcribe_audio_at_uri(recording_uri)
 
             logger.info(f"Transcript = {text}")
@@ -313,22 +309,26 @@ class TranscribeCall(Task):
 
             return {"call_sid": call_sid, "text": text}
 
-        except TranscribeExceptions.RequestError as exc:
+        except TranscribeExceptions.RequestError:
             # we retry on request errors
-            countdown = get_countdown(
-                self.retry_backoff,
-                self.request.retries,
-                self.retry_jitter,
-                self.retry_backoff_max,
-            )
-            raise self.retry(exc=exc, countdown=countdown)
+            try:
+                countdown = get_countdown(
+                    self.retry_backoff,
+                    self.request.retries,
+                    self.retry_jitter,
+                    self.retry_backoff_max,
+                )
+                self.retry(countdown=countdown)
 
-        except Exception as exc:
+            except MaxRetriesExceededError:
+                self.update_state(
+                    task_id=outer_task_id, state=State.transcribing_failed
+                )
+                raise
+
+        except Exception:
             # for other errors (unintelligible audio etc) we don't retry
-            logger.error(f"Transcription error: {exc}")
-
             self.update_state(task_id=outer_task_id, state=State.transcribing_failed)
-
             raise
 
 
