@@ -349,6 +349,7 @@ class ExtractInfo(Task):
         and location info.
         all key values (except transcription text) are None if extraction fails
         """
+
         text = request.get("text")
         call_sid = request.get("call_sid")
 
