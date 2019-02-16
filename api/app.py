@@ -203,9 +203,9 @@ def process():
 
     """
     Workflow:
-    place_call* - check_call_done* - get_recording* - transcribe* - extract* - send
-                                                         |                      |
-                                                      delete_recording -----  dummy
+    place_call* - check_call_done* - get_recording* - ...
+    ... - transcribe* - extract* - send* - delete_recording
+
 
     *: after failure, we invoke send_error to inform caller of error
     """
@@ -228,16 +228,13 @@ def process():
         transcribe.s(outer_task_id=task_id).set(
             link_error=send_error.s(ain, callback_url)
         ),
-        group(
-            chain(
-                extract_info.s(outer_task_id=task_id).set(
-                    link_error=send_error.s(ain, callback_url)
-                ),
-                send_result.s(ain, callback_url, outer_task_id=task_id),
-            ),
-            delete_recordings.s(),
+        extract_info.s(outer_task_id=task_id).set(
+            link_error=send_error.s(ain, callback_url)
         ),
-        dummy_task.s(ain, callback_url),
+        send_result.s(ain, callback_url, outer_task_id=task_id).set(
+            link_error=send_error.s(ain, callback_url)
+        ),
+        delete_recordings.s(),
     ).apply_async(task_id=task_id)
 
     return jsonify({"ain": ain, "task_id": result.task_id, "state": result.state})
