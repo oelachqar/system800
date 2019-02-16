@@ -183,26 +183,60 @@ class CheckCallProgress(Task):
 
 
 class PullRecording(Task):
+
+    max_retries = 10
+    retry_backoff = 30
+    retry_jitter = True
+    retry_backoff_max = 600
+
     track_started = True
+
+    default_error_message = "Error retrieving call recording"
 
     def run(self, call_sid, *, outer_task_id):
         # call has completed, find the recording uri
-        recordings = twilio.fetch_recordings(call_sid)
-        recording_uri = ""
-        if not recordings:
-            logger.error(f"Call {call_sid} completed with no recording")
+        try:
+            recordings = twilio.fetch_recordings(call_sid)
 
-            self.update_state(task_id=outer_task_id, state=State.error)
+            if not recordings or len(recordings) == 0:
+                logger.error(f"Call {call_sid} completed with no recording")
 
-            return {"call_sid": call_sid, "recording_uri": recording_uri}
+                raise CallExceptions.NoRecording
 
-        else:
             recording_uri = twilio.get_full_recording_uri(recordings[0])
+
             logger.info(f"Got recording_uri = {recording_uri}")
 
             self.update_state(task_id=outer_task_id, state=State.recording_ready)
 
             return {"call_sid": call_sid, "recording_uri": recording_uri}
+
+        except RequestException:
+            # we retry on request exceptions up to max retries
+            try:
+                countdown = get_countdown(
+                    self.retry_backoff,
+                    self.request.retries,
+                    self.retry_jitter,
+                    self.retry_backoff_max,
+                )
+                self.retry(countdown=countdown)
+
+            except MaxRetriesExceededError:
+                self.update_state(
+                    task_id=outer_task_id,
+                    state=State.recording_retrieval_error,
+                    meta={"error_message": self.default_error_message},
+                )
+                raise
+
+        except Exception:
+            self.update_state(
+                task_id=outer_task_id,
+                state=State.recording_retrieval_error,
+                meta={"error_message": self.default_error_message},
+            )
+            raise
 
 
 class DeleteRecordings(Task):
