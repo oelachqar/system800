@@ -91,7 +91,7 @@ def extract_date_time_base(s, words_to_nums=False):
     All other keys default to None.
 
     Loops through possible dates, returns as soon as dparser succeeds in
-    parsing date.
+    parsing date (dates are ordered by length)
 
     The parser seems to always return something, e.g.
     'on march 2021 at 4:30 pm' -->
@@ -121,21 +121,18 @@ def extract_date_time_base(s, words_to_nums=False):
         except Exception:
             # Unable to parse date
             pass
-    return d
+    #unable to parse any dates in possible dates
+    return None
 
 
 def extract_date_time(s):
-    """ If extract_date_time_base doesn't succeed, try again having replaced
-    homonyms.
+    """ If extract_date_time_base doesn't succeed, try again after having changed words to digits
+    and replaced homonyms.
     """
-    return (
-        extract_date_time_base(s)
-        or extract_date_time_base(replace_homonyms(s), words_to_nums=True)
-        or {"year": None, "month": None, "day": None, "hour": None, "minute": None}
-    )
-    # return (extract_date_time_base(s) or
-    #         extract_date_time_base(replace_homonyms(s), words_to_nums=True) or
-    #         None)
+    return (extract_date_time_base(s) or
+            extract_date_time_base(s, words_to_nums=True) or
+            extract_date_time_base(replace_homonyms(s), words_to_nums=True) or
+            {"year": None, "month": None, "day": None, "hour": None, "minute": None})
 
 
 if __name__ == "__main__":
@@ -143,6 +140,7 @@ if __name__ == "__main__":
         "your next Master hearing date January 19th 2018 at 3 p.m. for Gymboree",
         "twenty third street january seventh at ate a.m.",
         "march avenue february two thousand and twenty at nine a.m.",
+        "april thirteen two thousand and nineteen at four thirty AM",
         (
             "judge may smith at address involving march and 23rd st "
             "on May 10th 2018 at 3 p.m."
