@@ -25,6 +25,7 @@ class Config(object):
     google_credentials_json = base64.urlsafe_b64decode(
         os.getenv("GOOGLE_CREDENTIALS_JSON").encode("utf8")
     ).decode("utf8")
+    azure_speech_key = os.getenv("AZURE_SPEECH_KEY")
 
     # celery config
     celery_broker = os.getenv("CELERY_BROKER_URL")
@@ -42,4 +43,5 @@ class TestConfig(Config):
     test_call_recording_file = os.getenv("TEST_CALL_RECORDING_FILE")
 
     # speech to text testing
-    test_google_audio_path = os.getenv("TEST_GOOGLE_AUDIO_PATH")
+    test_google_audio_path = os.getenv("TEST_CALL_RECORDING_FILE")
+
