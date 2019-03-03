@@ -35,8 +35,8 @@ We are running a flask app with three routes:
                            c. Fetches the recording  of the call from Twilio
                            d. Transcribes this recording (using Google speech to text for the moment)
                            e. Deletes the recording on Twilio
-                           f. Extracts date, location info
-                           g. Sends a dictionary with transcription text and extracted date and location info to the callback url.       
+                           f. Extracts date, location info, and info on whether hearing is individual or master
+                           g. Sends a dictionary with transcription text and extracted date and location info to the callback url.
 2. status/
               This route gets the task_id, and returns the status (e.g. "calling", "transcribing", "transcribing_failed")
 3. debug_callback

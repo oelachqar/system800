@@ -11,7 +11,7 @@ from api.state import State
 from config import Config
 from workflow.call import exceptions as CallExceptions
 from workflow.call.twilio_call_wrapper import TwilioCallWrapper
-from workflow.extract import date_info, location_info
+from workflow.extract import date_info, location_info, hearing_type_info
 from workflow.transcribe import exceptions as TranscribeExceptions
 from workflow.transcribe.google_transcribe import GoogleTranscriber
 
@@ -345,8 +345,8 @@ class ExtractInfo(Task):
 
     def run(self, request, *, outer_task_id):
         """
-        returns dictionary with transcription text and keys relating to extracted date
-        and location info.
+        returns dictionary with transcription text and keys relating to extracted
+        date, location info and hearing info.
         all key values (except transcription text) are None if extraction fails
         """
 
@@ -364,7 +364,10 @@ class ExtractInfo(Task):
         location = location_info.extract_location(text)
         d.update(location)
 
-        logger.info(f"Date = {date}. Location = {location}")
+        hearing_type = hearing_type_info.extract_hearing_type(text)
+        d.update(hearing_type)
+
+        logger.info(f"Date = {date}. Location = {location}. Hearing Type = {hearing_type}")
         self.update_state(task_id=outer_task_id, state=State.extracting_done)
 
         return {"call_sid": call_sid, "data": d}
